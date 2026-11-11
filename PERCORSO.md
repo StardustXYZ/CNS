@@ -111,10 +111,10 @@ ntfy  ->  notifica sul telefono  ->  tocco  ->  Spotify si apre sulla ricerca de
 Ogni casella è un branch a parte (git worktree), con test automatici e prova nel browser a 375 px prima dell'ok.
 
 ### Fase 0 – Account e verifiche (da fare tu, niente codice)
-- [ ] Creare il progetto Firebase gratuito (piano Spark), attivare Firestore e l'accesso con Google; creare l'account di servizio per GitHub (ti guido passo per passo quando ci arriviamo).
-- [ ] Rendere pubblico il repository `StardustXYZ/CNS` e attivare Pages con "GitHub Actions".
-- [ ] Installare ntfy sul telefono e iscriversi a un argomento con un nome lungo e casuale.
-- [ ] Mettere i segreti su GitHub (Settings → Secrets): chiave del database e argomento ntfy. Sul PC vanno solo nel file `.env`.
+- [x] Creare il progetto Firebase gratuito (piano Spark), attivare Firestore e l'accesso con Google; creare l'account di servizio per GitHub. Fatto l'11/11/2026: progetto `cns-chi-ni-sindimu`, Firestore in modalità produzione, accesso Google con il dominio `stardustxyz.github.io`, app web "CNS telefono", chiave dell'account di servizio salvata fuori dal repository.
+- [x] Rendere pubblico il repository `StardustXYZ/CNS` e attivare Pages con "GitHub Actions".
+- [x] Installare ntfy sul telefono e iscriversi a un argomento con un nome lungo e casuale (provato con un messaggio dal browser).
+- [x] Mettere i segreti su GitHub (Settings → Secrets): `FIREBASE_SERVICE_ACCOUNT` e `NTFY_TOPIC`. Sul PC vanno solo nel file `.env`.
 - Il Premium di Spotify non serve più: puoi toglierlo quando vuoi.
 
 ### Fase 1 – Prova di fattibilità (il primo codice)
