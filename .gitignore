@@ -1,0 +1,18 @@
+# Segreti: mai nel repository
+.env
+.env.*
+*-firebase-adminsdk-*.json
+service-account*.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Sito costruito e file temporanei
+site/
+firebase-debug.log
+firestore-debug.log
+*.log
