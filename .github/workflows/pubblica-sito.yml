@@ -1,0 +1,55 @@
+# Pubblica l'app CNS su GitHub Pages (https://stardustxyz.github.io/CNS/).
+# Parte da sola quando cambiano i file dell'app su main, oppure a mano da
+# Actions -> "Pubblica il sito" -> Run workflow.
+# Serve: Settings -> Pages -> Source: GitHub Actions (già fatto nella Fase 0).
+name: Pubblica il sito
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "app/build_site.py"
+      - ".github/workflows/pubblica-sito.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pubblica-sito
+  cancel-in-progress: false
+
+jobs:
+  pubblica:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.pubblica.outputs.page_url }}
+    env:
+      TZ: Europe/Rome
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Installa CNS
+        run: pip install -e .
+
+      - name: Costruisci il sito
+        run: python -m app.build_site --out site
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - name: Pubblica su GitHub Pages
+        id: pubblica
+        uses: actions/deploy-pages@v5

@@ -129,10 +129,19 @@ Ogni casella è un branch a parte (git worktree), con test automatici e prova ne
   - la prova riparte da sola quando cambiano la prova, il client Deezer o la notifica, e manda una notifica di prova.
 
 ### Fase 2 – Scheletro (da CNV)
-- [ ] PWA vuota con le pagine Controllare, Recuperando, Novità, Impostazioni: menu su una riga, scorrimento, tema scuro verde e nero, service worker, manifest, icona.
-- [ ] Workflow principale: due giri programmati, riattivazione dei 60 giorni, azioni con Node 24, pubblicazione su Pages.
-- [ ] Test automatici con il Deezer finto.
+Divisa in tre branch, uno per funzione.
+
+**2a – App e pubblicazione**
+- [x] PWA vuota con le pagine Controllare, Recuperando, Novità, Impostazioni: menu su una riga, scorrimento tra le pagine, tema scuro verde e nero, service worker, manifest, icona (cuffie #008000 su nero, disegnate da `tools/crea_icone.py`).
+- [x] Costruzione del sito (`app/build_site.py`) con la versione nel service worker, e workflow "Pubblica il sito" su GitHub Pages quando cambia l'app su `main`.
+- [x] Test automatici della costruzione del sito.
+- [ ] Prova sul telefono dopo la pubblicazione: installazione sulla schermata Home e apertura senza connessione (il browser integrato usato per le prove non permette i service worker).
+
+**2b – Firebase**
 - [ ] Collegamento a Firebase: login Google nell'app, regole di accesso (solo tu puoi leggere e scrivere), lettura e scrittura da GitHub con l'account di servizio. Test delle regole con l'emulatore di Firebase, senza toccare i dati veri.
+
+**2c – Controllo programmato**
+- [ ] Workflow ogni 3 ore (minuti "strani"), riattivazione contro la pausa dei 60 giorni, azioni con Node 24. Per ora legge solo Firebase: il controllo delle uscite arriva nella Fase 4.
 
 ### Fase 3 – Artisti
 - [ ] Ricerca dell'artista per nome su Deezer dal telefono (JSONP, da provare per prima cosa); in alternativa, link Deezer incollato. L'elenco mostra foto e numero di fan per scegliere quello giusto.

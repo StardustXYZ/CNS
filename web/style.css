@@ -1,0 +1,160 @@
+/* ===== CNS (Chi Ni Sentimu) – dark theme, green and black (from CNV's style) ===== */
+
+:root {
+    --bg: #0b0b0b;
+    --surface: #161616;
+    --surface-2: #222;
+    --border: #333;
+    --text: #e6e6e6;
+    --text-muted: #9a9a9a;
+    --green: #008000;        /* CNS green: icon, buttons, active menu (white text on it) */
+    --accent: #33a833;       /* the same green, lighter: small text and links on black */
+    --yellow: #ff9800;
+    --red: #f44336;
+    --radius: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+a { color: var(--accent); }
+h1 { font-size: 1.5rem; line-height: 1.2; }
+h2 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; }
+
+/* ---- Navbar: logo, then the menu on one line ---- */
+.navbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.5rem 0.5rem;
+    background: #000;
+    border-bottom: 2px solid var(--green);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--text);
+}
+.logo img { border-radius: 6px; }
+.logo-sub { font-size: 0.8rem; font-weight: 500; font-style: italic; color: var(--text-muted); }
+
+/* One line: with more pages and their counts it scrolls sideways instead of wrapping */
+.nav-links {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.25rem 1rem;
+    align-items: center;
+    overflow-x: auto;
+    scrollbar-width: none;
+    max-width: 100%;
+}
+.nav-links::-webkit-scrollbar { display: none; }
+.nav-links a {
+    color: var(--text);
+    text-decoration: none;
+    white-space: nowrap;
+    padding: 0.35rem 0;
+    border-bottom: 3px solid transparent;
+    transition: color .2s, border-color .2s;
+}
+.nav-links a:hover { color: var(--accent); }
+.nav-links a.active { color: var(--accent); border-bottom-color: var(--green); font-weight: 600; }
+.count {
+    display: inline-block;
+    min-width: 1.4em;
+    padding: 0 0.35em;
+    margin-left: 0.15em;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-align: center;
+}
+
+/* ---- Buttons ---- */
+.btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.9rem;
+    text-decoration: none;
+    touch-action: manipulation;
+}
+.btn:hover { border-color: var(--accent); }
+.btn-primary { background: var(--green); border-color: var(--green); color: #fff; font-weight: 600; }
+.btn-primary:hover { opacity: 0.85; }
+
+/* ---- Layout ---- */
+.container { width: 100%; max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; flex: 1; }
+.page-header { margin-bottom: 1.25rem; }
+.subtitle { color: var(--text-muted); margin-top: 0.25rem; }
+.small { font-size: 0.8rem; color: var(--text-muted); }
+
+.card { background: var(--surface); border-radius: var(--radius); padding: 0.9rem 1rem; margin-bottom: 0.75rem; }
+.settings-list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+.settings-list li { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.settings-list .value { color: var(--text-muted); text-align: right; }
+.card-action { margin-top: 0.75rem; }
+
+/* ---- Empty state ---- */
+.empty-state {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--text-muted);
+    font-size: 1.05rem;
+}
+.empty-state .big { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+.empty-state .small { display: block; margin-top: 0.5rem; }
+
+/* ---- Footer ---- */
+.footer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-align: center;
+    padding: 1rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    margin-top: auto;
+}
+
+/* ---- Swipe between pages: the page follows the finger, then the new one slides in ---- */
+#app { transition: transform 0.15s ease-out; }
+#app.swipe-next { animation: cns-from-right 0.2s ease-out; }
+#app.swipe-prev { animation: cns-from-left 0.2s ease-out; }
+@keyframes cns-from-right { from { transform: translateX(32px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes cns-from-left { from { transform: translateX(-32px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+    #app, #app.swipe-next, #app.swipe-prev { transition: none; animation: none; }
+}
+
+/* ---- Small screens ---- */
+@media (max-width: 600px) {
+    .navbar { padding: 0.6rem 1rem 0.25rem; }
+    .nav-links { width: 100%; gap: 0.25rem 0.85rem; font-size: 0.95rem; } /* the four pages fit at 375 px */
+    .container { margin-top: 1rem; }
+}
