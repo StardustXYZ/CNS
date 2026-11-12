@@ -36,7 +36,8 @@ class Notification:
     title: str
     message: str
     click: str | None = None
-    attach: str | None = None
+    icon: str | None = None  # small picture next to the text
+    attach: str | None = None  # big picture (ntfy adds its own buttons for it)
     actions: tuple[tuple[str, str], ...] = field(default_factory=tuple)  # (label, url)
     priority: int = PRIORITY_DEFAULT
     tags: tuple[str, ...] = ("headphones",)
@@ -52,6 +53,8 @@ class Notification:
         }
         if self.click:
             body["click"] = self.click
+        if self.icon:
+            body["icon"] = self.icon
         if self.attach:
             body["attach"] = self.attach
         if self.actions:
@@ -74,23 +77,33 @@ def is_quiet(now: datetime, start: int = settings.QUIET_START, end: int = settin
 
 
 def release_notification(
-    artist: str, release: DeezerRelease, now: datetime, app_url: str = settings.APP_URL
+    artist: str,
+    release: DeezerRelease,
+    now: datetime,
+    app_url: str = settings.APP_URL,
+    big_cover: bool = settings.BIG_COVER,
 ) -> Notification:
-    """The notification for one new release of ``artist``."""
+    """The notification for one new release of ``artist``.
+
+    With ``big_cover`` the cover is attached (big picture) and only the Spotify button is
+    sent, since Android would hide the others behind ntfy's own attachment buttons.
+    """
     label = "Nuovo featuring" if release.is_featuring(artist) else NEW_LABELS.get(release.record_type, "Nuova uscita")
     lines = [release.title]
     if release.release_date:
         lines.append(f"Uscito il {release.release_date:%d/%m/%Y}")
     spotify = spotify_search_url(artist, release.title)
     actions = [("Apri su Spotify", spotify)]
-    if release.link:
-        actions.append(("Apri su Deezer", release.link))
-    actions.append(("Apri l'app", app_url))
+    if not big_cover:
+        if release.link:
+            actions.append(("Apri su Deezer", release.link))
+        actions.append(("Apri l'app", app_url))
     return Notification(
         title=f"{label}: {artist}",
         message="\n".join(lines),
         click=spotify,
-        attach=release.cover,
+        icon=None if big_cover else release.cover,
+        attach=release.cover if big_cover else None,
         actions=tuple(actions),
         priority=PRIORITY_QUIET if is_quiet(now) else PRIORITY_DEFAULT,
     )

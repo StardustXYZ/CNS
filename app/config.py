@@ -23,6 +23,10 @@ class Settings:
     # Notifications arrive without sound from QUIET_START to QUIET_END (Italian time)
     QUIET_START: int = 23
     QUIET_END: int = 8
+    # Cover in the notification: False = small picture next to the text and all three buttons;
+    # True = big picture, but Android then shows only "Apri su Spotify" (ntfy adds two buttons
+    # of its own for an attached picture, and Android shows at most three)
+    BIG_COVER: bool = False
 
 
 settings = Settings()

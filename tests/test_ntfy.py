@@ -48,10 +48,20 @@ def test_release_notification():
     assert n.title == "Nuovo singolo: Ava Max"
     assert n.message == "Christmas Wonderland\nUscito il 06/11/2026"
     assert n.click == spotify_search_url("Ava Max", "Christmas Wonderland")
-    assert n.attach == "https://cdn/cover.jpg"
+    assert n.icon == "https://cdn/cover.jpg"  # small cover: no attachment buttons from ntfy
+    assert n.attach is None
     assert [label for label, _ in n.actions] == ["Apri su Spotify", "Apri su Deezer", "Apri l'app"]
     assert n.actions[1][1] == "https://www.deezer.com/album/1139685681"
     assert n.priority == PRIORITY_DEFAULT
+    body = n.payload("t")
+    assert body["icon"] == "https://cdn/cover.jpg" and "attach" not in body
+
+
+def test_big_cover_keeps_only_the_spotify_button():
+    n = release_notification("Ava Max", release(), AFTERNOON, big_cover=True)
+    assert n.attach == "https://cdn/cover.jpg" and n.icon is None
+    assert [label for label, _ in n.actions] == ["Apri su Spotify"]
+    assert "icon" not in n.payload("t")
 
 
 @pytest.mark.parametrize("kind, title", [("album", "Nuovo album"), ("ep", "Nuovo EP"), ("compile", "Nuova raccolta"), ("boh", "Nuova uscita")])

@@ -15,6 +15,8 @@ on:
     paths:
       - ".github/workflows/prova-deezer.yml"
       - "app/check_deezer.py"
+      - "app/services/deezer.py"
+      - "app/services/ntfy.py"
 
 permissions:
   contents: read
