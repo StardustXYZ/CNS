@@ -118,10 +118,15 @@ Ogni casella è un branch a parte (git worktree), con test automatici e prova ne
 - Il Premium di Spotify non serve più: puoi toglierlo quando vuoi.
 
 ### Fase 1 – Prova di fattibilità (il primo codice)
-- [ ] Workflow "Prova Deezer" da avviare a mano: dai server di GitHub, discografia completa dei tuoi 7 artisti; conteggio di chiamate, tempi ed eventuali blocchi della protezione contro i bot. Riepilogo nella pagina del giro.
-- [ ] Prova della ricerca di un artista dal telefono (JSONP).
-- [ ] Prova di una notifica ntfy con copertina e pulsanti: come appare e se il tocco apre Spotify sulla ricerca giusta.
-- **Se Deezer blocca GitHub** ci fermiamo e scegliamo un'altra strada (es. la ricerca pubblica di iTunes) prima di andare avanti.
+- [x] Workflow "Prova Deezer": dai server di GitHub, discografia completa dei tuoi 7 artisti; conteggio di chiamate, tempi ed eventuali blocchi della protezione contro i bot. Riepilogo nella pagina del giro. **Riuscita il 12/11/2026**: nessun blocco, tutti e 7 gli artisti letti (16 chiamate, circa 6 secondi dal PC).
+- [x] Prova di una notifica ntfy con copertina e pulsanti. **Riuscita il 12/11/2026**: il tocco apre Spotify sulla ricerca giusta; tutti e tre i pulsanti funzionano.
+- ~~Prova della ricerca di un artista dal telefono (JSONP)~~ → spostata nella Fase 3, dove si costruisce la ricerca (dal PC Deezer risponde in JSONP).
+- Cose scoperte:
+  - la ricerca per nome su Deezer non mette sempre l'artista giusto per primo (Amy Lee è il 5° risultato): si sceglie quello con il nome identico e più fan;
+  - Android mostra al massimo 3 pulsanti e ntfy ne aggiunge 2 per una copertina allegata: la copertina va come **icona piccola** (impostazione `BIG_COVER` per tornare a quella grande con il solo pulsante di Spotify);
+  - Deezer non mostra le uscite future (0 per tutti): le anteprime della Fase 6 avranno bisogno di un'altra fonte;
+  - dal titolo si riconoscono pochi featuring (2 per Ava Max): nella Fase 3 si useranno gli artisti di ogni uscita;
+  - la prova riparte da sola quando cambiano la prova, il client Deezer o la notifica, e manda una notifica di prova.
 
 ### Fase 2 – Scheletro (da CNV)
 - [ ] PWA vuota con le pagine Controllare, Recuperando, Novità, Impostazioni: menu su una riga, scorrimento, tema scuro verde e nero, service worker, manifest, icona.
@@ -130,7 +135,7 @@ Ogni casella è un branch a parte (git worktree), con test automatici e prova ne
 - [ ] Collegamento a Firebase: login Google nell'app, regole di accesso (solo tu puoi leggere e scrivere), lettura e scrittura da GitHub con l'account di servizio. Test delle regole con l'emulatore di Firebase, senza toccare i dati veri.
 
 ### Fase 3 – Artisti
-- [ ] Ricerca dell'artista per nome su Deezer; in alternativa, link Deezer incollato.
+- [ ] Ricerca dell'artista per nome su Deezer dal telefono (JSONP, da provare per prima cosa); in alternativa, link Deezer incollato. L'elenco mostra foto e numero di fan per scegliere quello giusto.
 - [ ] Aggiunta dell'artista con ID, foto e nome.
 - [ ] Pagina dell'artista: tutte le uscite in ordine di data (album, singoli, EP, featuring, raccolte), con i doppioni uniti (deluxe, explicit/clean, ripubblicazioni) e i pulsanti Spotify e Deezer.
 
