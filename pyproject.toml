@@ -1,0 +1,28 @@
+[project]
+name = "cns"
+version = "0.1.0"
+description = "CNS – Chi Ni Sentimu: avvisi sulle uscite nuove dei cantanti seguiti e recupero delle discografie"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.25",
+    "python-dotenv>=1.0",
+    "tzdata; sys_platform == 'win32'",  # Italian time zone on Windows (Linux already has it)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.23",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]

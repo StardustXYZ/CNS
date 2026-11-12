@@ -1,0 +1,41 @@
+# Prova: Deezer risponde dai server di GitHub? E la notifica ntfy arriva sul telefono?
+# Parte da sola quando questo file o la prova cambiano (su qualsiasi ramo), oppure a mano da
+# Actions -> "Prova Deezer" -> Run workflow. Il risultato è nella pagina del giro (Summary).
+# Serve il segreto NTFY_TOPIC per la notifica; Deezer non chiede chiavi.
+name: Prova Deezer
+
+on:
+  workflow_dispatch:
+    inputs:
+      notifica:
+        description: "Manda anche una notifica di prova sul telefono"
+        type: boolean
+        default: true
+  push:
+    paths:
+      - ".github/workflows/prova-deezer.yml"
+      - "app/check_deezer.py"
+
+permissions:
+  contents: read
+
+jobs:
+  prova:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: Europe/Rome
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Installa CNS
+        run: pip install -e .
+
+      - name: Leggi le discografie da Deezer e manda la notifica di prova
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python -m app.check_deezer ${{ (github.event_name == 'push' || inputs.notifica) && '--notifica' || '' }}

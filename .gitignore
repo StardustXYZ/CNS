@@ -1,6 +1,7 @@
 # Segreti: mai nel repository
 .env
 .env.*
+!.env.example
 *-firebase-adminsdk-*.json
 service-account*.json
 
