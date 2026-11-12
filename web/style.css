@@ -119,6 +119,18 @@ h2 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; }
 .settings-list li { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .settings-list .value { color: var(--text-muted); text-align: right; }
 .card-action { margin-top: 0.75rem; }
+.button-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.btn:disabled { opacity: 0.6; cursor: wait; }
+code { background: var(--surface-2); padding: 0 0.3em; border-radius: 4px; font-size: 0.85em; }
+code.uid { word-break: break-all; user-select: all; }
+.error { color: var(--red); margin-top: 0.5rem; }
+.notice {
+    background: var(--surface);
+    border-left: 3px solid var(--green);
+    border-radius: var(--radius);
+    padding: 0.6rem 0.9rem;
+    margin-bottom: 1rem;
+}
 
 /* ---- Empty state ---- */
 .empty-state {

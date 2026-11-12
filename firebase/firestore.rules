@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// CNS: only the owner's account can read and write the lists.
+// __OWNER_UID__ is replaced with the owner's user code (GitHub secret OWNER_UID) when the
+// rules are published; until then nobody can read or write from the app.
+// GitHub writes with the service account, which does not go through these rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner() {
+      return request.auth != null && request.auth.uid == "__OWNER_UID__";
+    }
+
+    match /{document=**} {
+      allow read, write: if isOwner();
+    }
+  }
+}

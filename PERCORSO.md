@@ -135,10 +135,14 @@ Divisa in tre branch, uno per funzione.
 - [x] PWA vuota con le pagine Controllare, Recuperando, Novità, Impostazioni: menu su una riga, scorrimento tra le pagine, tema scuro verde e nero, service worker, manifest, icona (cuffie #008000 su nero, disegnate da `tools/crea_icone.py`).
 - [x] Costruzione del sito (`app/build_site.py`) con la versione nel service worker, e workflow "Pubblica il sito" su GitHub Pages quando cambia l'app su `main`.
 - [x] Test automatici della costruzione del sito.
-- [ ] Prova sul telefono dopo la pubblicazione: installazione sulla schermata Home e apertura senza connessione (il browser integrato usato per le prove non permette i service worker).
+- [x] Prova sul telefono dopo la pubblicazione: installazione sulla schermata Home e apertura senza connessione. **Riuscita il 12/11/2026** (prima Pages andava riattivato in Settings).
 
 **2b – Firebase**
-- [ ] Collegamento a Firebase: login Google nell'app, regole di accesso (solo tu puoi leggere e scrivere), lettura e scrittura da GitHub con l'account di servizio. Test delle regole con l'emulatore di Firebase, senza toccare i dati veri.
+- [x] Regole di accesso (`firebase/firestore.rules`): solo il codice utente del proprietario legge e scrive; finché il codice non è inserito, nessuno entra. Provate con l'emulatore (5 prove, progetto finto `demo-cns`).
+- [x] Login Google nell'app (Impostazioni): nome, email, codice utente da copiare, "Esci"; avviso nelle liste finché non si fa l'accesso. Il codice di Firebase viene salvato dal service worker per l'uso offline.
+- [x] Lettura e scrittura da GitHub con l'account di servizio (`app/services/firestore.py`, API REST) e "Prova Firebase", che scrive l'ora del contatto in `stato/github`: l'app la mostra in Impostazioni.
+- [x] Workflow "Test" a ogni push (Python e regole) e "Regole Firebase" per pubblicare le regole con il segreto `OWNER_UID`.
+- [ ] Sul telefono: accesso con Google, codice utente nel segreto `OWNER_UID`, pubblicazione delle regole, "Ultimo contatto da GitHub" visibile in Impostazioni.
 
 **2c – Controllo programmato**
 - [ ] Workflow ogni 3 ore (minuti "strani"), riattivazione contro la pausa dei 60 giorni, azioni con Node 24. Per ora legge solo Firebase: il controllo delle uscite arriva nella Fase 4.

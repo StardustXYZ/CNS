@@ -1,8 +1,9 @@
 // CNS (Chi Ni Sentimu) – app for the phone (and the PC).
 // Pages are chosen by the hash (#/, #/recuperando, …), as in CNV's phone version: the
 // menu stays on one line and a sideways swipe moves to the next or previous page.
-// The lists will come from Firebase (phase 2b); for now every page is empty.
-"use strict";
+// The lists live in Firebase: the owner signs in with Google from Impostazioni.
+// (A module: strict mode is implied.)
+import { explainError, signIn, signOutUser, startFirebase, watchDocument } from "./firebase.js";
 
 const BUILD = "__BUILD__"; // replaced by app/build_site.py with the build time
 const SWIPE_MIN = 70;      // px sideways to change page
@@ -17,6 +18,12 @@ const PAGES = [
 
 let swipeDirection = ""; // "next" | "prev": slide-in of the page drawn after a swipe
 let installPrompt = null; // Chrome's "add to home screen", when it offers it
+// Sign-in: state "loading" | "ready" | "unavailable" (Firebase did not load, e.g. offline the first time)
+const account = { state: "loading", user: null, error: "", busy: false };
+// What GitHub last wrote (stato/github): state "idle" | "loading" | "ok" | "error"
+let github = { state: "idle", data: null, error: "" };
+let stopGithub = null;
+let copied = false; // "Copia codice" was just pressed
 
 // ------------------------------------------------------------------ helpers
 
@@ -38,11 +45,19 @@ function emptyState(icon, text, note) {
     return `<p class="empty-state"><span class="big" aria-hidden="true">${icon}</span>${esc(text)}<span class="small">${esc(note)}</span></p>`;
 }
 
+const pad = (n) => String(n).padStart(2, "0");
+const dateTime = (d) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} alle ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+/** A reminder on the list pages until the owner has signed in. */
+function signInHint() {
+    if (account.state !== "ready" || account.user) return "";
+    return `<p class="notice">Per salvare le tue liste fai l'accesso con Google da <a href="#/impostazioni">Impostazioni</a>.</p>`;
+}
+
 function buildLabel() {
     if (BUILD.startsWith("__")) return "versione di prova (non pubblicata)";
     const when = new Date(BUILD);
     if (Number.isNaN(when.getTime())) return `versione ${BUILD}`;
-    const pad = (n) => String(n).padStart(2, "0");
     return `versione del ${pad(when.getDate())}/${pad(when.getMonth() + 1)}/${when.getFullYear()} ${pad(when.getHours())}:${pad(when.getMinutes())}`;
 }
 
@@ -50,12 +65,14 @@ function buildLabel() {
 
 function pageControllare() {
     return header("Controllare", "Gli artisti di cui vuoi sapere subito le uscite nuove.")
+        + signInHint()
         + emptyState("🎧", "Nessun artista da controllare per ora.",
             "Presto potrai cercarli su Deezer e aggiungerli qui: ti arriverà una notifica a ogni uscita nuova.");
 }
 
 function pageRecuperando() {
     return header("Recuperando", "Le discografie da ascoltare dall'inizio, una uscita alla volta.")
+        + signInHint()
         + emptyState("📀", "Nessuna discografia da recuperare per ora.",
             "Qui vedrai per ogni artista dove sei arrivato e cosa ti manca.");
 }
@@ -70,8 +87,9 @@ function pageImpostazioni() {
     const install = installPrompt
         ? `<p class="card-action"><button class="btn btn-primary" data-action="install">Aggiungi alla schermata Home</button></p>`
         : "";
-    return header("Impostazioni", "Come funzionano le notifiche e l'app.")
-        + `<h2>Notifiche</h2>
+    return header("Impostazioni", "Il tuo account, le notifiche e l'app.")
+        + `<h2>Account</h2>${accountCard()}${githubCard()}
+        <h2>Notifiche</h2>
         <div class="card"><ul class="settings-list">
             <li><span>Controllo delle uscite</span><span class="value">ogni 3 ore</span></li>
             <li><span>Di notte</span><span class="value">dalle 23 alle 8 senza suono</span></li>
@@ -85,6 +103,82 @@ function pageImpostazioni() {
             <li><span>Versione</span><span class="value">${esc(buildLabel())}</span></li>
             <li><span>Dati delle uscite</span><span class="value">Deezer</span></li>
         </ul>${install}</div>`;
+}
+
+function accountCard() {
+    if (account.state === "loading") return `<div class="card"><p class="small">Controllo dell'accesso…</p></div>`;
+    if (account.state === "unavailable") {
+        return `<div class="card"><p>Firebase non si è caricato: forse sei senza connessione.</p>
+            <p class="small">Riapri l'app quando sei online per accedere e vedere le tue liste.</p></div>`;
+    }
+    const error = account.error ? `<p class="error">${esc(account.error)}</p>` : "";
+    const disabled = account.busy ? " disabled" : "";
+    if (!account.user) {
+        return `<div class="card"><p>Accedi con il tuo account Google: le liste vengono salvate su Firebase e solo tu puoi vederle.</p>
+            ${error}<p class="card-action"><button class="btn btn-primary" data-action="sign-in"${disabled}>Accedi con Google</button></p></div>`;
+    }
+    const u = account.user;
+    return `<div class="card"><ul class="settings-list">
+            <li><span>Accesso fatto come</span><span class="value">${esc(u.name || u.email)}</span></li>
+            ${u.name && u.email ? `<li><span>Email</span><span class="value">${esc(u.email)}</span></li>` : ""}
+            <li><span>Codice utente</span><span class="value"><code class="uid">${esc(u.uid)}</code></span></li>
+        </ul>
+        <p class="small">Il codice utente va messo una volta sola nel segreto <code>OWNER_UID</code> su GitHub: così le regole di Firebase fanno entrare solo te.</p>
+        ${error}<p class="card-action button-row">
+            <button class="btn" data-action="copy-uid">${copied ? "Copiato ✓" : "Copia codice"}</button>
+            <button class="btn" data-action="sign-out"${disabled}>Esci</button>
+        </p></div>`;
+}
+
+function githubCard() {
+    if (!account.user) return "";
+    let text;
+    if (github.state === "loading") text = `<span class="small">lettura…</span>`;
+    else if (github.state === "error") text = `<span class="error">${esc(github.error)}</span>`;
+    else if (!github.data) text = "mai finora";
+    else {
+        const when = github.data.ultimo_contatto?.toDate?.();
+        text = when ? esc(dateTime(when)) : "data sconosciuta";
+    }
+    return `<div class="card"><ul class="settings-list">
+        <li><span>Ultimo contatto da GitHub</span><span class="value">${text}</span></li>
+    </ul></div>`;
+}
+
+// ------------------------------------------------------------------ Firebase
+
+function followGithub() {
+    stopGithub?.();
+    stopGithub = null;
+    github = { state: account.user ? "loading" : "idle", data: null, error: "" };
+    if (!account.user) return;
+    stopGithub = watchDocument("stato/github",
+        (data) => { github = { state: "ok", data, error: "" }; render(); },
+        (err) => { github = { state: "error", data: null, error: explainError(err) }; render(); });
+}
+
+async function accountAction(action) {
+    account.error = "";
+    if (action === "copy-uid") {
+        try {
+            await navigator.clipboard.writeText(account.user.uid);
+            copied = true;
+            setTimeout(() => { copied = false; render(); }, 2000);
+        } catch {
+            account.error = "Non riesco a copiare: tieni premuto sul codice per selezionarlo.";
+        }
+        render();
+        return;
+    }
+    account.busy = true;
+    render();
+    try {
+        await (action === "sign-in" ? signIn() : signOutUser());
+    } catch (err) {
+        account.error = explainError(err);
+    }
+    account.busy = false;
+    render();
 }
 
 // ------------------------------------------------------------------ rendering
@@ -119,6 +213,7 @@ window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); }
 document.addEventListener("click", (e) => {
     const button = e.target.closest("[data-action]");
     if (!button) return;
+    if (["sign-in", "sign-out", "copy-uid"].includes(button.dataset.action)) accountAction(button.dataset.action);
     if (button.dataset.action === "install" && installPrompt) {
         installPrompt.prompt();
         installPrompt.userChoice.finally(() => { installPrompt = null; render(); });
@@ -191,6 +286,16 @@ document.getElementById("app").addEventListener("animationend", (e) => e.current
 
 document.getElementById("version").textContent = buildLabel();
 render();
+
+startFirebase((user) => {
+    account.state = "ready";
+    account.user = user;
+    followGithub();
+    render();
+}).catch(() => {
+    account.state = "unavailable";
+    render();
+});
 
 if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => { /* works without, just not offline */ });

@@ -6,6 +6,8 @@ requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.25",
     "python-dotenv>=1.0",
+    "google-auth>=2.30",  # Firestore from GitHub: signs in with the service account
+    "requests>=2.31",     # used by google-auth to get the access token
     "tzdata; sys_platform == 'win32'",  # Italian time zone on Windows (Linux already has it)
 ]
 

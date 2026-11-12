@@ -27,6 +27,9 @@ class Settings:
     # True = big picture, but Android then shows only "Apri su Spotify" (ntfy adds two buttons
     # of its own for an attached picture, and Android shows at most three)
     BIG_COVER: bool = False
+    # Firebase: the service account key (the whole JSON file, as text) – secret
+    FIREBASE_SERVICE_ACCOUNT: str = field(default_factory=lambda: os.getenv("FIREBASE_SERVICE_ACCOUNT", "").strip())
+    FIREBASE_PROJECT_ID: str = "cns-chi-ni-sindimu"
 
 
 settings = Settings()

@@ -1,0 +1,37 @@
+# Prova: GitHub riesce a scrivere e rileggere Firestore con l'account di servizio?
+# Scrive l'ora del giro in stato/github: l'app la mostra in Impostazioni ("Ultimo contatto da GitHub").
+# Parte da sola quando la prova o il client di Firestore cambiano (su qualsiasi ramo), oppure a mano da
+# Actions -> "Prova Firebase" -> Run workflow. Serve il segreto FIREBASE_SERVICE_ACCOUNT.
+name: Prova Firebase
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/prova-firebase.yml"
+      - "app/prova_firebase.py"
+      - "app/services/firestore.py"
+
+permissions:
+  contents: read
+
+jobs:
+  prova:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: Europe/Rome
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Installa CNS
+        run: pip install -e .
+
+      - name: Scrivi e rileggi Firestore
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: python -m app.prova_firebase
