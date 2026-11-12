@@ -141,15 +141,31 @@ Divisa in tre branch, uno per funzione.
 - [x] Regole di accesso (`firebase/firestore.rules`): solo il codice utente del proprietario legge e scrive; finché il codice non è inserito, nessuno entra. Provate con l'emulatore (5 prove, progetto finto `demo-cns`).
 - [x] Login Google nell'app (Impostazioni): nome, email, codice utente da copiare, "Esci"; avviso nelle liste finché non si fa l'accesso. Il codice di Firebase viene salvato dal service worker per l'uso offline.
 - [x] Lettura e scrittura da GitHub con l'account di servizio (`app/services/firestore.py`, API REST) e "Prova Firebase", che scrive l'ora del contatto in `stato/github`: l'app la mostra in Impostazioni.
-- [x] Workflow "Test" a ogni push (Python e regole) e "Regole Firebase" per pubblicare le regole con il segreto `OWNER_UID`.
-- [ ] Sul telefono: accesso con Google, codice utente nel segreto `OWNER_UID`, pubblicazione delle regole, "Ultimo contatto da GitHub" visibile in Impostazioni.
+- [x] Workflow "Test" a ogni push (Python e regole) e "Regole Firebase" per pubblicare le regole.
+- ~~Codice utente nel segreto `OWNER_UID`~~ → superato dalla 3a: le regole sono diventate per utente (12/11/2026). La pubblicazione da GitHub è fallita perché l'account di servizio non ha il ruolo "Firebase Rules Admin": le regole si incollano a mano in Firebase → Firestore → Regole, oppure si dà quel ruolo all'account di servizio.
+
+Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), poi la **2c** e la **2d**.
 
 **2c – Controllo programmato**
 - [ ] Workflow ogni 3 ore (minuti "strani"), riattivazione contro la pausa dei 60 giorni, azioni con Node 24. Per ora legge solo Firebase: il controllo delle uscite arriva nella Fase 4.
 
+**2d – Multiutenza (amici e familiari, come in CNV)**
+- [x] Dati per utente: ogni account Google ha la sua cartella `utenti/{codice}` e vede solo quella (fatto nella 3a).
+- [ ] Lista degli ammessi, per non far entrare qualsiasi account Google.
+- [ ] Argomento ntfy per utente, salvato nelle sue impostazioni: le notifiche arrivano alla persona giusta.
+- [ ] Il controllo su GitHub chiede a Deezer una volta sola per artista, anche se lo seguono in più persone.
+- [ ] Pubblicazione delle regole da GitHub sistemata (ruolo "Firebase Rules Admin").
+
 ### Fase 3 – Artisti
-- [ ] Ricerca dell'artista per nome su Deezer dal telefono (JSONP, da provare per prima cosa); in alternativa, link Deezer incollato. L'elenco mostra foto e numero di fan per scegliere quello giusto.
-- [ ] Aggiunta dell'artista con ID, foto e nome.
+
+**3a – Liste e aggiunta**
+- [x] Ricerca dell'artista per nome su Deezer dal telefono (JSONP, funziona); in alternativa, link Deezer incollato. I risultati mostrano foto, fan e numero di uscite; prima il nome identico con più fan.
+- [x] Aggiunta a Controllare o Recuperando, con foto, nome, link e fan; contatori nel menu.
+- [x] Pagina dell'artista: lista (Controllare / Recuperando / Archivio), nota, "Apri su Deezer", "Togli dalle liste". L'Archivio è in fondo a Recuperando.
+- [x] Regole per utente con controllo dei dati (nome, lista valida, codice Deezer numerico, nota fino a 500 caratteri): 7 prove sull'emulatore.
+- [ ] Sul telefono: regole pubblicate, accesso con Google, aggiunta dei tuoi artisti.
+
+**3b – Discografia**
 - [ ] Pagina dell'artista: tutte le uscite in ordine di data (album, singoli, EP, featuring, raccolte), con i doppioni uniti (deluxe, explicit/clean, ripubblicazioni) e i pulsanti Spotify e Deezer.
 
 ### Fase 4 – Controllare (il cuore)

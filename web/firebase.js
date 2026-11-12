@@ -60,11 +60,47 @@ export function watchDocument(path, onData, onError) {
     return storeMod.onSnapshot(storeMod.doc(db, path), (snap) => onData(snap.exists() ? snap.data() : null), onError);
 }
 
+// ------------------------------------------------------------------ artists (utenti/{uid}/artisti/{Deezer id})
+
+const artistsPath = (uid) => `utenti/${uid}/artisti`;
+
+/** Follow the account's artists: ``onData([{id, nome, lista, …}])`` at every change. Returns a stop function. */
+export function watchArtists(uid, onData, onError) {
+    const { db, storeMod } = sdk;
+    return storeMod.onSnapshot(storeMod.collection(db, artistsPath(uid)),
+        (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), onError);
+}
+
+/** Add an artist found on Deezer to a list (or move it there if it is already saved). */
+export async function addArtist(uid, artist, lista) {
+    const { db, storeMod } = sdk;
+    await storeMod.setDoc(storeMod.doc(db, artistsPath(uid), artist.id), {
+        nome: artist.name,
+        foto: artist.picture || "",
+        link: artist.link || "",
+        fan: artist.fans || 0,
+        lista,
+        nota: "",
+        aggiunto: storeMod.serverTimestamp(),
+    }, { merge: true });
+}
+
+/** Change some fields of a saved artist (list, note). */
+export async function updateArtist(uid, id, fields) {
+    const { db, storeMod } = sdk;
+    await storeMod.updateDoc(storeMod.doc(db, artistsPath(uid), id), fields);
+}
+
+export async function removeArtist(uid, id) {
+    const { db, storeMod } = sdk;
+    await storeMod.deleteDoc(storeMod.doc(db, artistsPath(uid), id));
+}
+
 /** Firebase's error codes as a sentence in Italian. */
 export function explainError(err) {
     const code = err?.code || "";
     if (code === "permission-denied") {
-        return "Accesso negato: le regole di Firebase non contengono ancora il tuo codice utente.";
+        return "Accesso negato da Firebase: le regole di accesso non sono ancora state pubblicate.";
     }
     if (code === "auth/popup-blocked") return "Il browser ha bloccato la finestra di accesso: consenti i popup e riprova.";
     if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return "Accesso annullato.";

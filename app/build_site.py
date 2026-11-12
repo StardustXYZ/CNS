@@ -26,7 +26,7 @@ def build_site(out_dir: Path, build: str, web_dir: Path = WEB_DIR) -> None:
     """Copy the web app into ``out_dir`` and stamp it with ``build``."""
     if out_dir.exists():
         shutil.rmtree(out_dir)
-    shutil.copytree(web_dir, out_dir)
+    shutil.copytree(web_dir, out_dir, ignore=shutil.ignore_patterns("test"))  # the JS tests stay out of the site
     for name in VERSIONED:
         path = out_dir / name
         text = path.read_text(encoding="utf-8")

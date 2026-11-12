@@ -1,17 +1,13 @@
-# Pubblica le regole di accesso di Firestore (firebase/firestore.rules) con il codice utente
-# del proprietario al posto di __OWNER_UID__. Prima le prova sull'emulatore.
-# Parte da sola quando le regole cambiano su main, oppure a mano da
-# Actions -> "Regole Firebase" -> Run workflow (ad esempio dopo aver messo il segreto OWNER_UID).
-# Servono i segreti OWNER_UID (il codice utente mostrato in Impostazioni) e FIREBASE_SERVICE_ACCOUNT.
+# Pubblica le regole di accesso di Firestore (firebase/firestore.rules), dopo averle provate
+# sull'emulatore. Si avvia a mano: Actions -> "Regole Firebase" -> Run workflow.
+#
+# Serve il segreto FIREBASE_SERVICE_ACCOUNT, e l'account di servizio deve avere il ruolo
+# "Firebase Rules Admin" (console di Google Cloud -> IAM). Senza quel ruolo la pubblicazione
+# fallisce: in quel caso si incollano le regole a mano in Firebase -> Firestore -> Regole.
 name: Regole Firebase
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "firebase/firestore.rules"
-      - ".github/workflows/regole-firebase.yml"
 
 permissions:
   contents: read
@@ -47,45 +43,21 @@ jobs:
       - name: Prova le regole sull'emulatore
         run: npm test
 
-      - name: Controlla i segreti
-        id: segreti
+      - name: Pubblica le regole
         env:
-          OWNER_UID: ${{ secrets.OWNER_UID }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          if [ -z "$OWNER_UID" ]; then
-            msg="Regole non pubblicate: manca il segreto OWNER_UID. Fai l'accesso nell'app, copia il codice utente da Impostazioni, mettilo nel segreto OWNER_UID e rilancia questo workflow."
-            echo "::notice::$msg"
-            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
-            echo "pronti=no" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # Un codice utente di Firebase è fatto solo di lettere e cifre
-          if ! printf '%s' "$OWNER_UID" | grep -Eq '^[A-Za-z0-9]{20,128}$'; then
-            echo "::error::Il segreto OWNER_UID non sembra un codice utente (solo lettere e cifre, senza spazi)."
-            exit 1
-          fi
           if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
             echo "::error::Manca il segreto FIREBASE_SERVICE_ACCOUNT."
             exit 1
           fi
-          echo "pronti=si" >> "$GITHUB_OUTPUT"
-
-      - name: Pubblica le regole
-        if: steps.segreti.outputs.pronti == 'si'
-        env:
-          OWNER_UID: ${{ secrets.OWNER_UID }}
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: |
-          sed "s/__OWNER_UID__/$OWNER_UID/g" firestore.rules > firestore.pubblicate.rules
-          if grep -q "__OWNER_UID__" firestore.pubblicate.rules; then
-            echo "::error::Il codice utente non è stato inserito nelle regole."
-            exit 1
-          fi
-          # Le regole da pubblicare sono quelle con il codice utente
-          node -e 'const f="firebase.json",c=JSON.parse(require("fs").readFileSync(f));c.firestore.rules="firestore.pubblicate.rules";require("fs").writeFileSync(f,JSON.stringify(c,null,2))'
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/account.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/account.json"
-          npx firebase deploy --only firestore:rules --project cns-chi-ni-sindimu --non-interactive
+          if npx firebase deploy --only firestore:rules --project cns-chi-ni-sindimu --non-interactive; then
+            echo "Regole pubblicate: ogni account vede solo le sue liste." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::Pubblicazione non riuscita: probabilmente all'account di servizio manca il ruolo Firebase Rules Admin. Si possono incollare le regole a mano in Firebase -> Firestore -> Regole."
+            rm -f "$RUNNER_TEMP/account.json"
+            exit 1
+          fi
           rm -f "$RUNNER_TEMP/account.json"
-          echo "Regole pubblicate: solo il tuo account può leggere e scrivere." >> "$GITHUB_STEP_SUMMARY"

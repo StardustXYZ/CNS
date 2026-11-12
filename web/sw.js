@@ -1,10 +1,11 @@
 // Service worker: CNS opens even without connection (from CNV's sw.js).
 // __BUILD__ is replaced at every build, so phones get the new app after an update.
 const CACHE = "cns-__BUILD__";
-const SHELL = ["./", "index.html", "app.js", "firebase.js", "style.css", "manifest.webmanifest",
+const SHELL = ["./", "index.html", "app.js", "firebase.js", "deezer.js", "style.css", "manifest.webmanifest",
     "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png"];
-// Covers from Deezer get their own cache, kept across app updates (used from phase 3)
+// Photos and covers from Deezer get their own cache, kept across app updates
 const COVERS = "cns-covers";
+const isDeezerImage = (url) => url.hostname.endsWith(".dzcdn.net");
 // Firebase's code from Google's servers: the address holds the version, so a saved copy never changes
 const LIBS = "cns-libs";
 const LIBS_PREFIX = "https://www.gstatic.com/firebasejs/";
@@ -31,6 +32,15 @@ self.addEventListener("fetch", (event) => {
         event.respondWith(caches.open(LIBS).then((cache) =>
             cache.match(event.request).then((hit) => hit || fetch(event.request).then((resp) => {
                 if (resp.ok) cache.put(event.request, resp.clone());
+                return resp;
+            }))));
+        return;
+    }
+    if (isDeezerImage(url)) {
+        // Artist photos: the saved copy first, so the lists look the same offline
+        event.respondWith(caches.open(COVERS).then((cache) =>
+            cache.match(event.request).then((hit) => hit || fetch(event.request).then((resp) => {
+                if (resp.ok || resp.type === "opaque") cache.put(event.request, resp.clone());
                 return resp;
             }))));
         return;

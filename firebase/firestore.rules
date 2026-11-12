@@ -1,17 +1,37 @@
 rules_version = '2';
 
-// CNS: only the owner's account can read and write the lists.
-// __OWNER_UID__ is replaced with the owner's user code (GitHub secret OWNER_UID) when the
-// rules are published; until then nobody can read or write from the app.
-// GitHub writes with the service account, which does not go through these rules.
+// CNS: every Google account has its own folder, utenti/{its user code}, and reads and
+// writes only that one. GitHub uses the service account, which does not go through these rules.
+// Every collection is listed by name: what is not listed here is closed to everyone.
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isOwner() {
-      return request.auth != null && request.auth.uid == "__OWNER_UID__";
+    function isUser(uid) {
+      return request.auth != null && request.auth.uid == uid;
     }
 
-    match /{document=**} {
-      allow read, write: if isOwner();
+    // The account's own settings (later: ntfy topic, notification choices)
+    match /utenti/{uid} {
+      allow read, write: if isUser(uid);
+    }
+
+    // The account's artists: one document per Deezer artist, in the list "controllare",
+    // "recuperando" or "archivio"
+    match /utenti/{uid}/artisti/{artistId} {
+      allow read, delete: if isUser(uid);
+      allow create, update: if isUser(uid) && validArtist(artistId, request.resource.data);
+    }
+
+    // Written by GitHub; any signed-in account can see when GitHub last got in touch
+    match /stato/{doc} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    function validArtist(artistId, a) {
+      return artistId.matches('^[0-9]{1,20}$')
+        && a.nome is string && a.nome.size() > 0 && a.nome.size() <= 200
+        && a.lista in ['controllare', 'recuperando', 'archivio']
+        && (!('nota' in a) || (a.nota is string && a.nota.size() <= 500));
     }
   }
 }

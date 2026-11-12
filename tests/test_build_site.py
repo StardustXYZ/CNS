@@ -20,9 +20,13 @@ def site(tmp_path):
 
 
 def test_all_web_files_are_copied(site):
-    for name in ["index.html", "app.js", "style.css", "sw.js", "manifest.webmanifest",
+    for name in ["index.html", "app.js", "firebase.js", "deezer.js", "style.css", "sw.js", "manifest.webmanifest",
                  "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png"]:
         assert (site / name).is_file(), name
+
+
+def test_javascript_tests_are_not_published(site):
+    assert not (site / "test").exists()
 
 
 def test_version_is_stamped(site):

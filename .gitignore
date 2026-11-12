@@ -15,7 +15,6 @@ __pycache__/
 # Strumenti di Firebase (emulatore e test delle regole)
 node_modules/
 .firebase/
-firebase/firestore.pubblicate.rules
 
 # Sito costruito e file temporanei
 site/
