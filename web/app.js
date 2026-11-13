@@ -827,7 +827,8 @@ function accountCard() {
 function githubCard() {
     if (!account.user) return "";
     let text;
-    if (github.state === "loading") text = `<span class="small">lettura…</span>`;
+    if (notAllowed()) text = `<span class="error">non disponibile: il tuo account non è tra le persone ammesse</span>`;
+    else if (github.state === "loading") text = `<span class="small">lettura…</span>`;
     else if (github.state === "error") text = `<span class="error">${esc(github.error)}</span>`;
     else if (!github.data) text = "mai finora";
     else {

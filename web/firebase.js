@@ -138,7 +138,7 @@ export async function removeArtist(uid, id) {
 export function explainError(err) {
     const code = err?.code || "";
     if (code === "permission-denied") {
-        return "Accesso negato da Firebase: le regole di accesso non sono ancora state pubblicate.";
+        return "Accesso negato da Firebase: il tuo account non è tra le persone ammesse, oppure le regole di accesso non sono aggiornate.";
     }
     if (code === "auth/popup-blocked") return "Il browser ha bloccato la finestra di accesso: consenti i popup e riprova.";
     if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return "Accesso annullato.";

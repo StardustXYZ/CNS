@@ -160,7 +160,8 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
 - [x] Chi non è ammesso vede "Il tuo account (…) non è tra le persone ammesse a CNS".
 - [x] Il controllo su GitHub salta chi è stato tolto dalla lista (l'app salva l'email di ognuno nelle sue impostazioni).
 - [x] Argomento ntfy per utente, salvato nelle sue impostazioni (fatto nella Fase 4).
-- [ ] Sul telefono: lista degli ammessi creata nella console, regole incollate.
+- [x] Sul telefono: lista degli ammessi creata nella console (`config` → `ammessi` → campo `admin`, tipo string), regole incollate. **Riuscita il 13/11/2026.** Da ricordare: il codice utente va **incollato** con "Copia codice", non riscritto, perché "l" minuscola e "1" si confondono.
+- [x] Messaggio corretto anche nel riquadro "Ultimo controllo da GitHub" per chi non è ammesso.
 - [ ] Pubblicazione delle regole da GitHub: dare all'account di servizio il ruolo "Firebase Rules Admin" (console di Google Cloud → IAM), poi Actions → "Regole Firebase" → Run workflow. Il workflow resta da avviare a mano, per scegliere il momento giusto.
 
 ### Fase 3 – Artisti
