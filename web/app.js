@@ -3,7 +3,8 @@
 // menu stays on one line and a sideways swipe moves to the next or previous page.
 // Every Google account has its own lists in Firebase (utenti/{code}/artisti); artists are
 // found on Deezer. (A module: strict mode is implied.)
-import { artistIdFromLink, fansLabel, getArtist, searchArtists } from "./deezer.js";
+import { artistIdFromLink, fansLabel, getArtist, getDiscography, searchArtists } from "./deezer.js";
+import { KINDS, arrange, countKinds, dateLabel, groupReleases, releaseFromApi, spotifySearchUrl } from "./discografia.js";
 import {
     addArtist, explainError, removeArtist, signIn, signOutUser, startFirebase, updateArtist,
     watchArtists, watchDocument,
@@ -14,6 +15,7 @@ const SWIPE_MIN = 70;      // px sideways to change page
 const SWIPE_EDGE = 24;     // touches starting this close to the screen edge are Android's "back" gesture
 const SEARCH_DELAY_MS = 350; // wait for a pause in typing before asking Deezer
 const STALE_CHECK_HOURS = 9; // the check runs every 3 hours: after 9 the app warns
+const DISCOGRAPHY_FRESH_HOURS = 6; // a discography saved on the phone is asked again to Deezer after this
 
 const PAGES = [
     { path: "/", key: "controllare", label: "Controllare", render: pageControllare },
@@ -40,6 +42,11 @@ let copied = false; // "Copia codice" was just pressed
 // Search on Deezer: state "idle" | "loading" | "ok" | "error"
 const search = { query: "", state: "idle", results: [], error: "", timer: null, seq: 0 };
 let actionError = ""; // a failed add/move/remove, shown on the page
+// Discographies from Deezer: artist id -> { state: "loading" | "ok" | "error", releases, savedAt, error }
+const discographies = new Map();
+// What the artist page shows: kind filter ("" = all) and order, per artist (default: oldest
+// first in Recuperando, newest first elsewhere)
+const discographyView = new Map();
 
 // ------------------------------------------------------------------ helpers
 
@@ -234,9 +241,119 @@ function pageArtist(id) {
         <h2>Nota</h2>
         <textarea id="nota" data-id="${esc(a.id)}" maxlength="500" rows="3" placeholder="Ad esempio: arrivato a «Take Over»">${esc(a.nota || "")}</textarea>
         <p class="small">La nota si salva da sola quando esci dalla casella.</p>
-        <h2>Discografia</h2>
-        <p class="small">Tutte le uscite in ordine di data arrivano nella prossima parte. Per ora puoi vederle su Deezer.</p>
+        ${discographySection(a)}
         <p class="page-actions"><button class="btn btn-danger" data-action="remove" data-id="${esc(a.id)}">Togli dalle liste</button></p>`;
+}
+
+// ------------------------------------------------------------------ discography
+
+const cacheKey = (id) => `cns.discografia.${id}`;
+
+function readSavedDiscography(id) {
+    try {
+        const saved = JSON.parse(localStorage.getItem(cacheKey(id)));
+        return saved && Array.isArray(saved.releases) ? saved : null;
+    } catch {
+        return null;
+    }
+}
+
+function saveDiscography(id, releases, savedAt) {
+    try {
+        localStorage.setItem(cacheKey(id), JSON.stringify({ releases, savedAt }));
+    } catch { /* full or private mode: it is just asked again next time */ }
+}
+
+/** The artist's discography: the copy on the phone at once, then Deezer if the copy is old or missing. */
+function ensureDiscography(id, force = false) {
+    let entry = discographies.get(id);
+    if (!entry) {
+        const saved = readSavedDiscography(id);
+        entry = saved ? { state: "ok", releases: saved.releases, savedAt: saved.savedAt, error: "" } : { state: "idle", releases: [], savedAt: null, error: "" };
+        discographies.set(id, entry);
+    }
+    const fresh = entry.savedAt && Date.now() - new Date(entry.savedAt).getTime() < DISCOGRAPHY_FRESH_HOURS * 36e5;
+    const justFailed = entry.failedAt && Date.now() - entry.failedAt < 60 * 1000; // no retry loop when Deezer is down
+    if (entry.loading || ((fresh || justFailed) && !force)) return entry;
+    entry.loading = true;
+    if (!entry.releases.length) entry.state = "loading";
+    getDiscography(id).then((items) => {
+        const releases = items.map(releaseFromApi);
+        const savedAt = new Date().toISOString();
+        Object.assign(entry, { state: "ok", releases, savedAt, error: "", loading: false, failedAt: 0 });
+        saveDiscography(id, releases, savedAt);
+    }).catch((err) => {
+        // With a saved copy, keep showing it; otherwise explain
+        Object.assign(entry, { state: entry.releases.length ? "ok" : "error", error: err.message, loading: false, failedAt: Date.now() });
+    }).finally(() => {
+        if (currentView().key === "artista" && decodeURIComponent(route().path.slice("/artista/".length)) === id) render();
+    });
+    return entry;
+}
+
+function viewOf(a) {
+    return discographyView.get(a.id) || { kind: "", oldestFirst: a.lista === "recuperando" };
+}
+
+function discographySection(a) {
+    const entry = ensureDiscography(a.id);
+    let body;
+    if (entry.state === "loading" || entry.state === "idle") {
+        body = `<p class="small">Carico la discografia da Deezer…</p>`;
+    } else if (entry.state === "error") {
+        body = `<p class="error">Discografia non caricata: ${esc(entry.error)}.</p>
+            <p class="card-action"><button class="btn" data-action="disco-reload" data-id="${esc(a.id)}">Riprova</button></p>`;
+    } else {
+        const groups = groupReleases(entry.releases, a.nome);
+        const counts = countKinds(groups);
+        const view = viewOf(a);
+        const kind = counts[view.kind] ? view.kind : "";
+        const chip = (key, label, n) => `<button class="chip${kind === key ? " active" : ""}" data-action="disco-kind" data-id="${esc(a.id)}" data-kind="${key}"
+            aria-pressed="${kind === key}">${esc(label)} <span class="count">${n}</span></button>`;
+        const chips = [chip("", "Tutte", groups.length),
+            ...Object.entries(KINDS).filter(([key]) => counts[key]).map(([key, k]) => chip(key, k.plural, counts[key]))].join("");
+        const rows = arrange(groups, kind, view.oldestFirst).map((g) => releaseRow(a, g)).join("");
+        const saved = entry.savedAt ? new Date(entry.savedAt) : null;
+        const offline = entry.error ? ` · <span class="warn">Deezer non risponde: è la copia salvata</span>` : "";
+        body = `<div class="chips" role="group" aria-label="Tipo di uscita">${chips}</div>
+            <p class="disco-tools">
+                <button class="btn btn-small" data-action="disco-order" data-id="${esc(a.id)}">${view.oldestFirst ? "↑ Dalla più vecchia" : "↓ Dalla più recente"}</button>
+                <span class="small">${saved ? `aggiornata il ${esc(dateTime(saved))}` : ""}${offline}</span>
+            </p>
+            ${rows ? `<div class="release-list">${rows}</div>` : `<p class="small">Nessuna uscita su Deezer.</p>`}`;
+    }
+    return `<h2>Discografia</h2>${body}`;
+}
+
+function releaseRow(a, g) {
+    const r = g.main;
+    const cover = r.cover
+        ? `<img class="cover" src="${esc(r.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+        : `<span class="cover placeholder" aria-hidden="true">💿</span>`;
+    const versions = g.versions.length
+        ? `<details class="versions"><summary>+${g.versions.length} ${g.versions.length === 1 ? "versione" : "versioni"}</summary><ul>${g.versions.map((v) =>
+            `<li><a href="${esc(v.link)}" target="_blank" rel="noopener">${esc(v.title)}</a> <span class="small">· ${esc(dateLabel(v.date))}</span></li>`).join("")}</ul></details>`
+        : "";
+    return `<div class="release">${cover}
+        <div class="release-info"><strong>${esc(r.title)}</strong>
+            <span class="small">${esc(KINDS[g.kind].label)} · ${esc(dateLabel(g.date))}${r.explicit ? " · 🅴" : ""}</span>${versions}</div>
+        <div class="release-actions">
+            <a class="btn btn-small btn-primary" href="${esc(spotifySearchUrl(a.nome, r.title))}" target="_blank" rel="noopener">Spotify</a>
+            <a class="btn btn-small" href="${esc(r.link)}" target="_blank" rel="noopener">Deezer</a>
+        </div></div>`;
+}
+
+function discographyAction(button) {
+    const a = savedArtist(button.dataset.id);
+    if (!a) return;
+    const view = { ...viewOf(a) };
+    if (button.dataset.action === "disco-kind") view.kind = button.dataset.kind;
+    if (button.dataset.action === "disco-order") view.oldestFirst = !view.oldestFirst;
+    if (button.dataset.action === "disco-reload") {
+        ensureDiscography(a.id, true);
+    }
+    discographyView.set(a.id, view);
+    render();
 }
 
 // ------------------------------------------------------------------ account (Impostazioni)
@@ -444,6 +561,7 @@ document.addEventListener("click", (e) => {
     const action = button.dataset.action;
     if (["sign-in", "sign-out", "copy-uid"].includes(action)) accountAction(action);
     if (["add", "move", "remove"].includes(action)) artistAction(button);
+    if (["disco-kind", "disco-order", "disco-reload"].includes(action)) discographyAction(button);
     if (action === "install" && installPrompt) {
         installPrompt.prompt();
         installPrompt.userChoice.finally(() => { installPrompt = null; render(); });
@@ -494,7 +612,7 @@ document.addEventListener("touchstart", (e) => {
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
     if (t.clientX < SWIPE_EDGE || t.clientX > window.innerWidth - SWIPE_EDGE) return;
-    if (e.target.closest(".nav-links, .segmented, input, select, textarea")) return; // they scroll or type by themselves
+    if (e.target.closest(".nav-links, .segmented, .chips, input, select, textarea")) return; // they scroll or type by themselves
     swipe = { x: t.clientX, y: t.clientY, horizontal: null };
 }, { passive: true });
 

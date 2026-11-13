@@ -70,3 +70,17 @@ export async function searchArtists(query) {
 export async function getArtist(id) {
     return artistFromApi(await jsonp(`/artist/${encodeURIComponent(id)}`));
 }
+
+const PAGE_SIZE = 100;
+const MAX_PAGES = 50; // a safety stop: 5000 releases
+
+/** Every item of an artist's discography as Deezer gives it (all pages; raw objects). */
+export async function getDiscography(id) {
+    const items = [];
+    for (let page = 0; page < MAX_PAGES; page++) {
+        const data = await jsonp(`/artist/${encodeURIComponent(id)}/albums`, { limit: PAGE_SIZE, index: page * PAGE_SIZE });
+        items.push(...(data.data || []));
+        if (!data.next || !(data.data || []).length) break;
+    }
+    return items;
+}

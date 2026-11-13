@@ -170,7 +170,12 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
 - [x] Sul telefono: regole pubblicate (incollate a mano nella console), accesso con Google, aggiunta dei tuoi artisti. **Riuscita il 13/11/2026.**
 
 **3b – Discografia**
-- [ ] Pagina dell'artista: tutte le uscite in ordine di data (album, singoli, EP, featuring, raccolte), con i doppioni uniti (deluxe, explicit/clean, ripubblicazioni) e i pulsanti Spotify e Deezer.
+- [x] Pagina dell'artista: tutte le uscite da Deezer (tutte le pagine), con filtri per tipo (Album, EP, Singoli, Featuring, Raccolte) e ordine per data. In Recuperando parte dalla più vecchia, altrove dalla più recente.
+- [x] Doppioni uniti (`web/discografia.js`): remix, Deluxe/Edition, explicit/clean, versioni acustiche, live e strumentali, "feat." di altri finiscono sotto l'originale come "+N versioni". Un album e il singolo con lo stesso nome restano separati; un EP e la sua versione deluxe sono la stessa uscita. Sui dati veri: Ava Max da 114 a 51 uscite, Lady Gaga da 82 a 50.
+- [x] Pulsanti "Spotify" (ricerca artista + titolo) e "Deezer" (link esatto) su ogni uscita.
+- [x] Copia della discografia sul telefono: si apre subito e anche offline; si chiede di nuovo a Deezer dopo 6 ore.
+- [ ] Sul telefono.
+- Da ricordare per la Fase 4: il controllo su GitHub dovrà usare le stesse regole per i doppioni (in Python), così una versione nuova di un'uscita già vista non arriva come "uscita nuova".
 
 ### Fase 4 – Controllare (il cuore)
 - [ ] Lista "Controllare" con la nota per artista e i tipi da segnalare (tutti accesi di default, featuring compresi).
