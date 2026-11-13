@@ -7,7 +7,7 @@ import { artistIdFromLink, fansLabel, getArtist, getDiscography, searchArtists }
 import { KINDS, arrange, countKinds, dateLabel, groupReleases, releaseFromApi, spotifySearchUrl } from "./discografia.js";
 import { DEFAULT_KINDS, LISTENED, SKIPPED, mark, markUpTo, progress, queueOf, undoLast, unmark } from "./segnalibro.js";
 import {
-    addArtist, explainError, removeArtist, removeNovita, saveSettings, signIn, signOutUser, startFirebase,
+    addArtist, explainError, removeArtist, removeNovita, saveAllowList, saveSettings, signIn, signOutUser, startFirebase,
     updateArtist, watchAnteprime, watchArtists, watchDocument, watchNovita,
 } from "./firebase.js";
 
@@ -44,6 +44,11 @@ let novita = { state: "idle", list: [], error: "" };
 let anteprime = { state: "idle", list: [], error: "" }; // announced releases ("In arrivo"), written by GitHub
 const ntfyTest = { state: "", message: "" }; // "Manda una prova": "" | "sending" | "ok" | "error"
 let ntfyDraft = null; // what is being typed in the topic box (kept when the page is redrawn)
+// The allow list (config/ammessi): readable only by the administrator, who manages it from Impostazioni
+let allowList = { state: "idle", data: {}, error: "" };
+let allowDraft = ""; // the e-mail being typed in the "Persone ammesse" box
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_ALLOWED = 50;
 const NOVITA_SEEN_KEY = "cns.novita.vista"; // when Novità was last opened on this phone (for the menu count)
 const TOPIC_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 let stopWatching = [];
@@ -112,9 +117,16 @@ function signInHint() {
 }
 
 function errorNotice() {
+    if (notAllowed()) {
+        return `<p class="notice notice-error">Il tuo account (${esc(account.user.email || "senza email")}) non è tra le persone ammesse a CNS.
+            Chiedi a chi gestisce l'app di aggiungere questa email, poi riapri l'app.</p>`;
+    }
     const text = actionError || (artists.state === "error" ? artists.error : "");
     return text ? `<p class="notice notice-error">${esc(text)}</p>` : "";
 }
+
+/** Signed in, but Firebase refuses everything: the account is not in the allow list. */
+const notAllowed = () => Boolean(account.user) && artists.state === "error" && artists.code === "permission-denied";
 
 function buildLabel() {
     if (BUILD.startsWith("__")) return "versione di prova (non pubblicata)";
@@ -713,12 +725,63 @@ async function clearNovita() {
 
 // ------------------------------------------------------------------ account (Impostazioni)
 
+// ------------------------------------------------------------------ allow list (administrator only)
+
+const isAdmin = () => allowList.state === "ok" && allowList.data.admin === account.user?.uid;
+
+function allowListCard() {
+    if (!isAdmin()) return "";
+    const emails = Array.isArray(allowList.data.email) ? allowList.data.email : [];
+    const rows = emails.length
+        ? `<ul class="allow-list">${emails.map((e) => `<li><span>${esc(e)}</span>
+            <button class="link-button" data-action="allow-remove" data-email="${esc(e)}">togli</button></li>`).join("")}</ul>`
+        : `<p class="small">Per ora entri solo tu.</p>`;
+    const error = allowList.error ? `<p class="error">${esc(allowList.error)}</p>` : "";
+    return `<div class="card"><p><strong>Persone ammesse</strong></p>
+        <p class="small">Solo tu (l'amministratore) e queste email Google possono usare CNS; ognuno vede solo le sue liste.</p>
+        ${rows}
+        <input type="text" id="allow-email" value="${esc(allowDraft)}" placeholder="email@gmail.com" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <p class="card-action"><button class="btn btn-primary" data-action="allow-add"${emails.length >= MAX_ALLOWED ? " disabled" : ""}>Aggiungi</button></p>
+        ${error}</div>`;
+}
+
+async function allowListAction(button) {
+    const emails = Array.isArray(allowList.data.email) ? allowList.data.email : [];
+    allowList.error = "";
+    let next;
+    if (button.dataset.action === "allow-add") {
+        const email = allowDraft.trim().toLowerCase();
+        if (!EMAIL_PATTERN.test(email)) {
+            allowList.error = "Scrivi un indirizzo email valido.";
+            render();
+            return;
+        }
+        if (emails.includes(email)) {
+            allowList.error = "Questa email è già nella lista.";
+            render();
+            return;
+        }
+        next = [...emails, email];
+    } else {
+        const email = button.dataset.email;
+        if (!confirm(`Togliere ${email}? Non potrà più usare CNS (le sue liste restano salvate).`)) return;
+        next = emails.filter((e) => e !== email);
+    }
+    try {
+        await saveAllowList(next);
+        allowDraft = "";
+    } catch (err) {
+        allowList.error = explainError(err);
+    }
+    render();
+}
+
 function pageImpostazioni() {
     const install = installPrompt
         ? `<p class="card-action"><button class="btn btn-primary" data-action="install">Aggiungi alla schermata Home</button></p>`
         : "";
     return header("Impostazioni", "Il tuo account, le notifiche e l'app.")
-        + `<h2>Account</h2>${accountCard()}${githubCard()}
+        + `<h2>Account</h2>${accountCard()}${githubCard()}${allowListCard()}
         <h2>Notifiche</h2>
         ${ntfyCard()}
         <div class="card"><ul class="settings-list">
@@ -792,9 +855,16 @@ function followAccount() {
     userSettings = { state: uid ? "loading" : "idle", data: {}, error: "" };
     novita = { state: uid ? "loading" : "idle", list: [], error: "" };
     anteprime = { state: uid ? "loading" : "idle", list: [], error: "" };
+    allowList = { state: "idle", data: {}, error: "" };
     if (!uid) return;
     stopWatching.push(watchDocument(`utenti/${uid}`,
-        (data) => { userSettings = { state: "ok", data: data || {}, error: "" }; render(); },
+        (data) => {
+            userSettings = { state: "ok", data: data || {}, error: "" };
+            // The e-mail goes with the settings: the check on GitHub uses it to skip people no longer admitted
+            const email = (account.user?.email || "").toLowerCase();
+            if (email && userSettings.data.email !== email) saveSettings(uid, { email }).catch(() => { /* not admitted */ });
+            render();
+        },
         (err) => { userSettings = { state: "error", data: {}, error: explainError(err) }; render(); }));
     stopWatching.push(watchAnteprime(uid,
         (list) => { anteprime = { state: "ok", list, error: "" }; render(); },
@@ -807,7 +877,11 @@ function followAccount() {
         (err) => { github = { state: "error", data: null, error: explainError(err) }; render(); }));
     stopWatching.push(watchArtists(uid,
         (list) => { artists = { state: "ok", list, error: "" }; render(); },
-        (err) => { artists = { state: "error", list: [], error: explainError(err) }; render(); }));
+        (err) => { artists = { state: "error", list: [], error: explainError(err), code: err?.code || "" }; render(); }));
+    // Only the administrator can read the allow list: for everybody else this is refused, and that is fine
+    stopWatching.push(watchDocument("config/ammessi",
+        (data) => { allowList = { state: "ok", data: data || {}, error: "" }; render(); },
+        () => { allowList = { state: "none", data: {}, error: "" }; render(); }));
 }
 
 async function accountAction(action) {
@@ -882,7 +956,7 @@ function render() {
     if (typing?.id === "search" && view.key === "cerca" && app.querySelector("#results")) {
         // Typing a search: redraw only the results, so the box keeps the focus and the keyboard
         app.querySelector("#results").innerHTML = searchResults(route().params.get("lista") === "recuperando" ? "recuperando" : "controllare");
-    } else if ((typing?.id === "nota" && view.key === "artista") || (typing?.id === "ntfy-topic" && view.key === "impostazioni")) {
+    } else if ((typing?.id === "nota" && view.key === "artista") || (["ntfy-topic", "allow-email"].includes(typing?.id) && view.key === "impostazioni")) {
         // Writing in a box: leave the page as it is until the box is left
     } else {
         app.innerHTML = view.render();
@@ -937,6 +1011,7 @@ document.addEventListener("click", (e) => {
     if (action.startsWith("bm-") && action !== "bm-auto") bookmarkAction(button);
     if (action === "alert-kind") alertAction(button);
     if (action === "ntfy-save" || action === "ntfy-test") ntfyAction(action);
+    if (action === "allow-add" || action === "allow-remove") allowListAction(button);
     if (action === "novita-clear") clearNovita();
     if (action === "install" && installPrompt) {
         installPrompt.prompt();
@@ -946,6 +1021,7 @@ document.addEventListener("click", (e) => {
 
 document.addEventListener("input", (e) => {
     if (e.target.id === "ntfy-topic") ntfyDraft = e.target.value;
+    if (e.target.id === "allow-email") allowDraft = e.target.value;
     if (e.target.id !== "search") return;
     search.query = e.target.value;
     scheduleSearch();
@@ -958,7 +1034,7 @@ document.addEventListener("change", (e) => {
 
 document.addEventListener("focusout", (e) => {
     // After leaving the note box, draw the page again with what was saved
-    if (e.target.id === "nota" || e.target.id === "ntfy-topic") setTimeout(render, 0);
+    if (["nota", "ntfy-topic", "allow-email"].includes(e.target.id)) setTimeout(render, 0);
 });
 
 window.addEventListener("beforeinstallprompt", (e) => {

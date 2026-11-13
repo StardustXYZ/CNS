@@ -303,3 +303,7 @@ textarea { resize: vertical; }
 .release.coming { border-left: 3px solid var(--green); }
 .release.coming .when { color: var(--accent); font-size: 0.85rem; font-weight: 600; }
 .release.coming.today { background: var(--surface-2); }
+
+/* ---- Allow list (administrator) ---- */
+.allow-list { list-style: none; margin: 0.5rem 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.allow-list li { display: flex; justify-content: space-between; gap: 0.75rem; align-items: center; overflow-wrap: anywhere; }

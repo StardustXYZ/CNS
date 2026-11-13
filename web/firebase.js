@@ -60,6 +60,14 @@ export function watchDocument(path, onData, onError) {
     return storeMod.onSnapshot(storeMod.doc(db, path), (snap) => onData(snap.exists() ? snap.data() : null), onError);
 }
 
+// ------------------------------------------------------------------ allow list (administrator only)
+
+/** Replace the e-mails admitted to CNS (config/ammessi.email); the rules let only the administrator do it. */
+export async function saveAllowList(emails) {
+    const { db, storeMod } = sdk;
+    await storeMod.updateDoc(storeMod.doc(db, "config/ammessi"), { email: emails });
+}
+
 // ------------------------------------------------------------------ settings and Novità
 
 /** Save the account's settings (e.g. {ntfy: "topic"}), keeping the other fields. */

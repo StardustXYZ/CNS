@@ -1,13 +1,43 @@
 rules_version = '2';
 
 // CNS: every Google account has its own folder, utenti/{its user code}, and reads and
-// writes only that one. GitHub uses the service account, which does not go through these rules.
+// writes only that one, if it is admitted: the administrator (config/ammessi.admin, a user
+// code written once in the Firebase console) and the e-mails in config/ammessi.email,
+// which the administrator manages from the app. Without config/ammessi nobody gets in.
+// GitHub uses the service account, which does not go through these rules.
 // Every collection is listed by name: what is not listed here (e.g. "visti", the releases
 // already seen, kept by GitHub) is closed to everyone.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function allowList() {
+      return get(/databases/$(database)/documents/config/ammessi).data;
+    }
+
+    function hasAllowList() {
+      return exists(/databases/$(database)/documents/config/ammessi);
+    }
+
+    function isAdmin() {
+      return request.auth != null && hasAllowList() && allowList().admin == request.auth.uid;
+    }
+
+    function isAllowed() {
+      return request.auth != null && hasAllowList()
+        && (allowList().admin == request.auth.uid
+            || (request.auth.token.email_verified == true
+                && request.auth.token.email.lower() in allowList().get('email', [])));
+    }
+
     function isUser(uid) {
-      return request.auth != null && request.auth.uid == uid;
+      return request.auth != null && request.auth.uid == uid && isAllowed();
+    }
+
+    // Who is admitted: only the administrator reads and changes it (not who the administrator is)
+    match /config/ammessi {
+      allow read: if isAdmin();
+      allow update: if isAdmin() && request.resource.data.admin == resource.data.admin
+        && validAllowList(request.resource.data);
+      allow create, delete: if false;
     }
 
     // The account's own settings: the ntfy topic where its notifications arrive
@@ -36,10 +66,14 @@ service cloud.firestore {
       allow create, update: if false;
     }
 
-    // Written by GitHub; any signed-in account can see when GitHub last got in touch
+    // Written by GitHub; the admitted accounts can see when GitHub last got in touch
     match /stato/{doc} {
-      allow read: if request.auth != null;
+      allow read: if isAllowed();
       allow write: if false;
+    }
+
+    function validAllowList(d) {
+      return d.keys().hasOnly(['admin', 'email']) && d.email is list && d.email.size() <= 50;
     }
 
     function validSettings(s) {

@@ -54,6 +54,7 @@ NOTIFY_LIST = "controllare"  # only these get a notification; in Recuperando the
 RECENT_DAYS = 30  # an older release appearing now is Deezer filling in its catalogue, not news
 MAX_SINGLE_NOTIFICATIONS = 3  # more new releases for one person become one notification
 TOPIC_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+ALLOW_LIST_PATH = "config/ammessi"  # who may use CNS (managed by the administrator in the app)
 
 
 @dataclass
@@ -150,6 +151,7 @@ class Report:
     itunes_errors: int = 0
     announced: int = 0
     reminders: int = 0
+    not_admitted: int = 0
 
 
 @dataclass
@@ -186,12 +188,27 @@ def notifications_for(news: UserNews, now: datetime) -> list:
     return out
 
 
+def is_admitted(uid: str, settings_doc: dict, allow_list: dict | None) -> bool:
+    """Whether the person is still admitted (config/ammessi): the administrator, or an e-mail in
+    the list. The app saves each person's e-mail in their settings. Without a list: everybody."""
+    if allow_list is None:
+        return True
+    if allow_list.get("admin") == uid:
+        return True
+    email = str(settings_doc.get("email") or "").strip().lower()
+    return bool(email) and email in [str(e).lower() for e in allow_list.get("email", [])]
+
+
 async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
-                    sender_for: Callable[[str], NotificationSender], report: Report) -> None:
+                    sender_for: Callable[[str], NotificationSender], report: Report,
+                    allow_list: dict | None = None) -> None:
     """Save the user's news in Novità and send the notifications to their topic."""
+    settings_doc = await db.get(f"utenti/{uid}") or {}
+    if not is_admitted(uid, settings_doc, allow_list):
+        report.not_admitted += 1  # removed from the list: nothing more for them
+        return
     for item in news.releases:
         await db.set(f"utenti/{uid}/novita/{item.release.id}", novita_document(item, now))
-    settings_doc = await db.get(f"utenti/{uid}") or {}
     topic = str(settings_doc.get("ntfy") or "").strip()
     if not TOPIC_PATTERN.match(topic):
         report.no_topic += 1  # still in the app: the notification waits for a topic in Impostazioni
@@ -258,6 +275,7 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
     users = {uid for a in artists.values() for uid in a.followers}
     lists = Counter(data.get("lista") for a in artists.values() for data in a.followers.values())
     saved_announcements = announcements_by_user(await db.collection_group("anteprime")) if itunes else {}
+    allow_list = await db.get(ALLOW_LIST_PATH)
     report = Report()
     today = now.date()
     per_user: dict[str, UserNews] = {}
@@ -300,7 +318,7 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
     for uid, user_news in per_user.items():
         if user_news:
             report.users_told += 1
-            await tell_user(db, uid, user_news, now, sender_for, report)
+            await tell_user(db, uid, user_news, now, sender_for, report, allow_list)
     await db.set(STATUS_PATH, {
         "ultimo_contatto": now,
         "origine": "controllo",
@@ -330,6 +348,7 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
         f"| Notifiche inviate | {report.notifications} |",
         f"| Notifiche non riuscite | {report.notification_errors} |",
         f"| Persone senza argomento ntfy (solo in Novità) | {report.no_topic} |",
+        f"| Persone non più ammesse (saltate) | {report.not_admitted} |",
     ]
 
 

@@ -196,3 +196,19 @@ async def test_status_and_report_have_numbers_but_no_names_codes_or_topics():
     assert "| Uscite nuove | 1 |" in report and "| Notifiche inviate | 1 |" in report
     for secret in ["Ava Max", "Christmas", "vincenzo", "argomento-di-vincenzo", AVA]:
         assert secret not in report
+
+
+async def test_people_removed_from_the_allow_list_get_nothing():
+    allow = {"admin": "vincenzo", "email": ["Amica@Example.com"]}
+    store = store_with_history(
+        [("vincenzo", AVA, "Ava Max", "controllare", {}), ("amica", AVA, "Ava Max", "controllare", {}),
+         ("ex", AVA, "Ava Max", "controllare", {})],
+        {"config/ammessi": allow,
+         "utenti/amica": {"ntfy": "argomento-dell-amica", "email": "amica@example.com"},
+         "utenti/ex": {"ntfy": "argomento-dell-ex", "email": "ex@example.com"}},
+    )
+    ntfy = FakeNtfy()
+    lines = await run_check(store, FakeDeezer({AVA: AVA_OLD + [rel(3, "Christmas Wonderland", "2026-11-06")]}), NOW, ntfy)
+    assert sorted(topic for topic, _ in ntfy.sent) == ["argomento-dell-amica", "argomento-di-vincenzo"]
+    assert "utenti/ex/novita/3" not in store.docs
+    assert "| Persone non più ammesse (saltate) | 1 |" in lines

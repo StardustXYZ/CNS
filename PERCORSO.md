@@ -156,9 +156,12 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
 **2d – Multiutenza (amici e familiari, come in CNV)**
 - [x] Dati per utente: ogni account Google ha la sua cartella `utenti/{codice}` e vede solo quella (fatto nella 3a).
 - [x] Il controllo raggruppa gli artisti: uno seguito da più persone viene chiesto a Deezer una volta sola (fatto nella 2c).
-- [ ] Lista degli ammessi, per non far entrare qualsiasi account Google.
-- [ ] Argomento ntfy per utente, salvato nelle sue impostazioni: le notifiche arrivano alla persona giusta.
-- [ ] Pubblicazione delle regole da GitHub sistemata (ruolo "Firebase Rules Admin").
+- [x] Lista degli ammessi (`config/ammessi`): l'amministratore è il codice utente scritto una volta a mano nella console (non si cambia dall'app); le email ammesse si aggiungono e tolgono in Impostazioni → "Persone ammesse", visibile solo all'amministratore. Le regole fanno entrare solo l'amministratore e le email verificate della lista (senza badare alle maiuscole); senza la lista non entra nessuno. 15 prove delle regole.
+- [x] Chi non è ammesso vede "Il tuo account (…) non è tra le persone ammesse a CNS".
+- [x] Il controllo su GitHub salta chi è stato tolto dalla lista (l'app salva l'email di ognuno nelle sue impostazioni).
+- [x] Argomento ntfy per utente, salvato nelle sue impostazioni (fatto nella Fase 4).
+- [ ] Sul telefono: lista degli ammessi creata nella console, regole incollate.
+- [ ] Pubblicazione delle regole da GitHub: dare all'account di servizio il ruolo "Firebase Rules Admin" (console di Google Cloud → IAM), poi Actions → "Regole Firebase" → Run workflow. Il workflow resta da avviare a mano, per scegliere il momento giusto.
 
 ### Fase 3 – Artisti
 
@@ -208,7 +211,7 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
 - [x] Nell'app: "In arrivo" in cima a Novità e nella pagina dell'artista, con "esce il … (tra N giorni)", Apple Music e, il giorno dell'uscita, Spotify.
 - [x] Regole di Firebase: anteprime scritte solo da GitHub (11 prove). **Vanno incollate di nuovo nella console.**
 - [x] Prova sull'emulatore con Deezer e iTunes veri: ENHYPEN e Justice in Controllare → due notifiche "In arrivo" (20/11 e 11/12), nessuna ripetizione al secondo giro, sezione "In arrivo" nell'app.
-- [ ] Sul telefono, dopo la pubblicazione.
+- [x] Pubblicata il 13/11/2026, regole incollate; primo controllo vero su GitHub riuscito (avviato a mano alle 19:23).
 
 ### Fase 7 – Rifiniture
 - [ ] Copia di sicurezza ed esportazione delle liste in JSON.

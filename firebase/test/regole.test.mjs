@@ -14,9 +14,16 @@ before(async () => {
     });
 });
 after(() => env.cleanup());
-beforeEach(() => env.clearFirestore());
+// Admitted: the administrator "vincenzo" and the e-mail of "amico"; "estraneo" is not
+const ALLOW_LIST = { admin: "vincenzo", email: ["amico@example.com"] };
+beforeEach(async () => {
+    await env.clearFirestore();
+    await seed("config/ammessi", ALLOW_LIST);
+});
 
-const as = (uid) => env.authenticatedContext(uid).firestore();
+/** A signed-in Google account: its e-mail is "<uid>@example.com" (verified, as with Google). */
+const as = (uid, email = `${uid}@example.com`, verified = true) =>
+    env.authenticatedContext(uid, { email, email_verified: verified }).firestore();
 const anonymous = () => env.unauthenticatedContext().firestore();
 const AVA = { nome: "Ava Max", lista: "controllare", nota: "", foto: "https://cdn/ava.jpg", fan: 1235611 };
 
@@ -109,4 +116,36 @@ test("le uscite in arrivo le scrive solo GitHub: si leggono, non si scrivono, gl
     await assertSucceeds(getDocs(collection(db, "utenti/vincenzo/anteprime")));
     await assertFails(setDoc(doc(db, "utenti/vincenzo/anteprime/951"), { titolo: "Falsa" }));
     await assertFails(getDocs(collection(as("amico"), "utenti/vincenzo/anteprime")));
+});
+
+// ---- Lista degli ammessi (2d) ----
+
+test("chi non è tra gli ammessi non entra nemmeno nella sua cartella", async () => {
+    const db = as("estraneo");
+    await assertFails(setDoc(doc(db, "utenti/estraneo/artisti/12948083"), AVA));
+    await assertFails(getDocs(collection(db, "utenti/estraneo/artisti")));
+    await assertFails(setDoc(doc(db, "utenti/estraneo"), { ntfy: "argomento" }));
+    await seed("stato/github", { ultimo_contatto: new Date() });
+    await assertFails(getDoc(doc(db, "stato/github")));
+});
+
+test("un'email ammessa entra solo se verificata, e senza badare alle maiuscole", async () => {
+    await assertSucceeds(setDoc(doc(as("amico", "Amico@Example.com"), "utenti/amico/artisti/12948083"), AVA));
+    await assertFails(setDoc(doc(as("amico", "amico@example.com", false), "utenti/amico/artisti/1"), AVA));
+});
+
+test("solo l'amministratore legge e cambia la lista, ma non può cambiare chi è l'amministratore", async () => {
+    await assertSucceeds(getDoc(doc(as("vincenzo"), "config/ammessi")));
+    await assertSucceeds(updateDoc(doc(as("vincenzo"), "config/ammessi"), { email: ["amico@example.com", "mamma@example.com"] }));
+    await assertFails(updateDoc(doc(as("vincenzo"), "config/ammessi"), { admin: "qualcun-altro" }));
+    await assertFails(updateDoc(doc(as("vincenzo"), "config/ammessi"), { email: ["x"], altro: true }));
+    await assertFails(getDoc(doc(as("amico"), "config/ammessi")));
+    await assertFails(updateDoc(doc(as("amico"), "config/ammessi"), { email: ["amico@example.com", "intruso@example.com"] }));
+    await assertFails(deleteDoc(doc(as("vincenzo"), "config/ammessi")));
+});
+
+test("senza la lista degli ammessi non entra nessuno", async () => {
+    await env.withSecurityRulesDisabled((ctx) => deleteDoc(doc(ctx.firestore(), "config/ammessi")));
+    await assertFails(getDocs(collection(as("vincenzo"), "utenti/vincenzo/artisti")));
+    await assertFails(setDoc(doc(as("vincenzo"), "config/ammessi"), ALLOW_LIST)); // it is created only in the console
 });
