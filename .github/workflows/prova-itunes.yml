@@ -1,0 +1,35 @@
+# Prova: iTunes risponde dai server di GitHub e mostra le uscite annunciate (preordini)?
+# Parte da sola quando questo file o la prova cambiano (su qualsiasi ramo), oppure a mano da
+# Actions -> "Prova iTunes" -> Run workflow. Il risultato è nella pagina del giro (Summary).
+# Non usa chiavi né segreti.
+name: Prova iTunes
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/prova-itunes.yml"
+      - "app/prova_itunes.py"
+      - "app/services/itunes.py"
+
+permissions:
+  contents: read
+
+jobs:
+  prova:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: Europe/Rome
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Installa CNS
+        run: pip install -e .
+
+      - name: Cerca gli artisti su iTunes e le uscite annunciate
+        run: python -m app.prova_itunes

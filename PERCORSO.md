@@ -198,8 +198,14 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
 - [x] Sul telefono: League of Legends fino a "Take Over" e Amy Lee fino a "Aftermath" con «Arrivato qui». **Riuscita il 13/11/2026.**
 
 ### Fase 6 – Anteprime
-- [ ] Prova di fattibilità di Deezer, iTunes e MusicBrainz sui tuoi artisti; si sceglie la fonte migliore.
-- [ ] "Esce il …" nella pagina dell'artista e nelle Novità, con un promemoria ntfy il giorno dell'uscita.
+- [x] Prova di fattibilità dal PC (13/11/2026), con i tuoi artisti più 13 molto noti e due preordini veri (ENHYPEN 20/11, Justice 11/12):
+  - **iTunes / Apple Music** (ricerca pubblica, senza chiavi): mostra i preordini con la data futura ed è aggiornato → **scelto** (decisione del 13/11/2026);
+  - **Deezer**: non mostra le uscite future;
+  - **MusicBrainz**: rifiuta quasi tutte le richieste anonime (errore 503); servirebbe mandargli un contatto.
+- [x] Client iTunes (`app/services/itunes.py`): circa 20 chiamate al minuto come chiede Apple; l'artista giusto è quello con il nome uguale e più titoli in comune con Deezer (cinque "Justice" su iTunes). Se il nome su iTunes è più lungo ("League of Legends Music") vale solo con almeno 3 titoli in comune. Dal PC: tutti e 9 gli artisti abbinati giusti.
+- [ ] Prova da GitHub ("Prova iTunes"): Apple risponde anche dai server di GitHub?
+- [ ] Nel controllo ogni 3 ore: notifica "In arrivo: … esce il …" una volta sola, promemoria "Esce oggi" il giorno dell'uscita, niente doppione quando l'uscita arriva su Deezer.
+- [ ] Nell'app: "In arrivo" in cima a Novità e nella pagina dell'artista.
 
 ### Fase 7 – Rifiniture
 - [ ] Copia di sicurezza ed esportazione delle liste in JSON.
