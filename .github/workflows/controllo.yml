@@ -1,0 +1,58 @@
+# Controllo delle uscite, ogni 3 ore, anche con il PC spento.
+# Per ora (fase 2c) legge gli artisti di tutti gli utenti da Firebase e segna il giro in
+# stato/github (l'app lo mostra in Impostazioni). Il confronto con le uscite già viste e le
+# notifiche arrivano nella Fase 4.
+# Il registro di un repository pubblico lo può leggere chiunque: il controllo vi scrive solo numeri.
+# Serve il segreto FIREBASE_SERVICE_ACCOUNT. A mano: Actions -> "Controllo delle uscite" -> Run workflow.
+name: Controllo delle uscite
+
+on:
+  schedule:
+    # Ogni 3 ore, al minuto 17: allo scoccare dell'ora GitHub è più carico e ritarda di più
+    # (in CNV i giri partivano anche con ore di ritardo). Con 8 giri al giorno, se uno salta
+    # c'è il successivo. Ore UTC: in Italia 01:17, 04:17, 07:17… (02:17, 05:17… con l'ora legale).
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write    # tenere attivo il controllo automatico (ultimo passo)
+
+concurrency:
+  group: controllo
+  cancel-in-progress: false
+
+jobs:
+  controllo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: Europe/Rome
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Installa CNS
+        run: pip install -e .
+
+      - name: Controlla gli artisti
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: python -m app.controllo
+
+      # In un repository pubblico GitHub mette in pausa gli orari programmati dopo 60 giorni
+      # senza attività. Riattivare il workflow a ogni giro azzera il conto: non serve nessun
+      # commit e, se non riesce, il controllo di questo giro è comunque fatto. (Da CNV.)
+      - name: Tieni attivo il controllo automatico
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail --silent --show-error -X PUT \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/controllo.yml/enable"
+          echo "Controllo automatico attivo"

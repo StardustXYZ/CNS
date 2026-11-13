@@ -147,13 +147,17 @@ Divisa in tre branch, uno per funzione.
 Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), poi la **2c** e la **2d**.
 
 **2c – Controllo programmato**
-- [ ] Workflow ogni 3 ore (minuti "strani"), riattivazione contro la pausa dei 60 giorni, azioni con Node 24. Per ora legge solo Firebase: il controllo delle uscite arriva nella Fase 4.
+- [x] Workflow "Controllo delle uscite" ogni 3 ore al minuto 17, riattivazione contro la pausa dei 60 giorni (da CNV), azioni con Node 24.
+- [x] Per ora legge gli artisti di tutti gli utenti (`app/controllo.py`), li raggruppa per artista Deezer e segna il giro in `stato/github`. Il confronto con le uscite e le notifiche arrivano nella Fase 4.
+- [x] Il registro del giro è pubblico: contiene solo numeri, mai nomi di artisti o codici utente (c'è un test apposta).
+- [x] Nell'app, Impostazioni → "Ultimo controllo da GitHub", con un avviso se GitHub non controlla da più di 9 ore.
+- [ ] Primo giro automatico verificato su GitHub.
 
 **2d – Multiutenza (amici e familiari, come in CNV)**
 - [x] Dati per utente: ogni account Google ha la sua cartella `utenti/{codice}` e vede solo quella (fatto nella 3a).
+- [x] Il controllo raggruppa gli artisti: uno seguito da più persone viene chiesto a Deezer una volta sola (fatto nella 2c).
 - [ ] Lista degli ammessi, per non far entrare qualsiasi account Google.
 - [ ] Argomento ntfy per utente, salvato nelle sue impostazioni: le notifiche arrivano alla persona giusta.
-- [ ] Il controllo su GitHub chiede a Deezer una volta sola per artista, anche se lo seguono in più persone.
 - [ ] Pubblicazione delle regole da GitHub sistemata (ruolo "Firebase Rules Admin").
 
 ### Fase 3 – Artisti
@@ -163,7 +167,7 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
 - [x] Aggiunta a Controllare o Recuperando, con foto, nome, link e fan; contatori nel menu.
 - [x] Pagina dell'artista: lista (Controllare / Recuperando / Archivio), nota, "Apri su Deezer", "Togli dalle liste". L'Archivio è in fondo a Recuperando.
 - [x] Regole per utente con controllo dei dati (nome, lista valida, codice Deezer numerico, nota fino a 500 caratteri): 7 prove sull'emulatore.
-- [ ] Sul telefono: regole pubblicate, accesso con Google, aggiunta dei tuoi artisti.
+- [x] Sul telefono: regole pubblicate (incollate a mano nella console), accesso con Google, aggiunta dei tuoi artisti. **Riuscita il 13/11/2026.**
 
 **3b – Discografia**
 - [ ] Pagina dell'artista: tutte le uscite in ordine di data (album, singoli, EP, featuring, raccolte), con i doppioni uniti (deluxe, explicit/clean, ripubblicazioni) e i pulsanti Spotify e Deezer.

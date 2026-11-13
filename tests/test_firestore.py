@@ -94,6 +94,25 @@ async def test_set_sends_typed_fields():
     assert json.loads(log[0].content) == {"fields": {"origine": {"stringValue": "prova"}, "giro": {"nullValue": None}}}
 
 
+async def test_collection_group_lists_documents_of_every_user():
+    name = "projects/demo-cns/databases/(default)/documents/utenti/{}/artisti/{}"
+    answer = [
+        {"document": {"name": name.format("u1", "12948083"), "fields": {"nome": {"stringValue": "Ava Max"}}}, "readTime": "x"},
+        {"document": {"name": name.format("u2", "1182"), "fields": {"nome": {"stringValue": "Arctic Monkeys"}}}, "readTime": "x"},
+    ]
+    log = []
+    async with client({f"{BASE}:runQuery": httpx.Response(200, json=answer)}, log) as db:
+        found = await db.collection_group("artisti")
+    assert found == [("utenti/u1/artisti/12948083", {"nome": "Ava Max"}), ("utenti/u2/artisti/1182", {"nome": "Arctic Monkeys"})]
+    assert log[0].method == "POST"
+    assert json.loads(log[0].content) == {"structuredQuery": {"from": [{"collectionId": "artisti", "allDescendants": True}]}}
+
+
+async def test_collection_group_with_no_documents():
+    async with client({f"{BASE}:runQuery": httpx.Response(200, json=[{"readTime": "2026-11-13T10:00:00Z"}])}) as db:
+        assert await db.collection_group("artisti") == []
+
+
 async def test_errors_are_explained():
     denied = httpx.Response(403, json={"error": {"code": 403, "message": "Missing or insufficient permissions."}})
     async with client({f"{BASE}/stato/github": denied}) as db:

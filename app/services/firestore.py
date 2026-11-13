@@ -133,6 +133,8 @@ class DocumentStore(Protocol):
 
     async def set(self, path: str, data: dict) -> None: ...
 
+    async def collection_group(self, collection_id: str) -> list[tuple[str, dict]]: ...
+
 
 class FirestoreClient:
     """Async Firestore client. Use as ``async with FirestoreClient.from_settings() as db: ...``.
@@ -149,6 +151,7 @@ class FirestoreClient:
     ) -> None:
         self.project_id = project_id
         self._token = token
+        self._root = f"projects/{project_id}/databases/(default)/documents"
         self._client = httpx.AsyncClient(
             base_url=f"{FIRESTORE_URL}/projects/{project_id}/databases/(default)/documents/",
             timeout=timeout,
@@ -202,3 +205,19 @@ class FirestoreClient:
         resp = await self._request("PATCH", path, json={"fields": encode_fields(data)})
         if resp.status_code == 404:
             raise FirestoreError(f"percorso non valido: {path}")
+
+    async def collection_group(self, collection_id: str) -> list[tuple[str, dict]]:
+        """Every document in every collection called ``collection_id``, wherever it is
+        (e.g. "artisti" of all the users), as (path, fields) pairs; the path is like
+        ``"utenti/<code>/artisti/12948083"``."""
+        query = {"structuredQuery": {"from": [{"collectionId": collection_id, "allDescendants": True}]}}
+        resp = await self._request("POST", f"{FIRESTORE_URL}/{self._root}:runQuery", json=query)
+        if resp.status_code == 404:
+            raise FirestoreError("database di Firestore non trovato")
+        prefix = f"{self._root}/"
+        found = []
+        for item in resp.json():
+            document = item.get("document")  # the answer holds only "readTime" when nothing matches
+            if document:
+                found.append((document["name"].removeprefix(prefix), decode_fields(document.get("fields", {}))))
+        return found

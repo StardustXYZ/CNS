@@ -13,6 +13,7 @@ const BUILD = "__BUILD__"; // replaced by app/build_site.py with the build time
 const SWIPE_MIN = 70;      // px sideways to change page
 const SWIPE_EDGE = 24;     // touches starting this close to the screen edge are Android's "back" gesture
 const SEARCH_DELAY_MS = 350; // wait for a pause in typing before asking Deezer
+const STALE_CHECK_HOURS = 9; // the check runs every 3 hours: after 9 the app warns
 
 const PAGES = [
     { path: "/", key: "controllare", label: "Controllare", render: pageControllare },
@@ -296,10 +297,14 @@ function githubCard() {
     else {
         const when = github.data.ultimo_contatto?.toDate?.();
         text = when ? esc(dateTime(when)) : "data sconosciuta";
+        // Three runs in a row missing (GitHub can be hours late, but not this much)
+        if (when && Date.now() - when.getTime() > STALE_CHECK_HOURS * 36e5) {
+            text += `<br><span class="warn">in ritardo: GitHub non controlla da più di ${STALE_CHECK_HOURS} ore</span>`;
+        }
     }
     return `<div class="card"><ul class="settings-list">
-        <li><span>Ultimo contatto da GitHub</span><span class="value">${text}</span></li>
-    </ul></div>`;
+        <li><span>Ultimo controllo da GitHub</span><span class="value">${text}</span></li>
+    </ul><p class="small">Il controllo parte da solo ogni 3 ore, anche con il telefono e il PC spenti.</p></div>`;
 }
 
 // ------------------------------------------------------------------ Firebase
