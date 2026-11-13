@@ -5,6 +5,7 @@
 // found on Deezer. (A module: strict mode is implied.)
 import { artistIdFromLink, fansLabel, getArtist, getDiscography, searchArtists } from "./deezer.js";
 import { KINDS, arrange, countKinds, dateLabel, groupReleases, releaseFromApi, spotifySearchUrl } from "./discografia.js";
+import { DEFAULT_KINDS, LISTENED, SKIPPED, mark, markUpTo, progress, queueOf, undoLast, unmark } from "./segnalibro.js";
 import {
     addArtist, explainError, removeArtist, signIn, signOutUser, startFirebase, updateArtist,
     watchArtists, watchDocument,
@@ -42,6 +43,7 @@ let copied = false; // "Copia codice" was just pressed
 // Search on Deezer: state "idle" | "loading" | "ok" | "error"
 const search = { query: "", state: "idle", results: [], error: "", timer: null, seq: 0 };
 let actionError = ""; // a failed add/move/remove, shown on the page
+let infoMessage = ""; // something done for the user (e.g. moved to Controllare at the end of a discography)
 // Discographies from Deezer: artist id -> { state: "loading" | "ok" | "error", releases, savedAt, error }
 const discographies = new Map();
 // What the artist page shows: kind filter ("" = all) and order, per artist (default: oldest
@@ -116,11 +118,30 @@ function buildLabel() {
 // ------------------------------------------------------------------ list pages
 
 function artistCard(a) {
-    const detail = a.nota ? esc(a.nota) : a.fan ? esc(fansLabel(a.fan)) : "";
+    let detail = a.nota ? esc(a.nota) : a.fan ? esc(fansLabel(a.fan)) : "";
+    let bar = "";
+    if (a.lista === "recuperando") {
+        // The bookmark: how far along, and what comes next
+        const { queue } = artistQueue(a);
+        if (queue?.finished) detail = "Discografia finita 🎉";
+        else if (queue?.next) {
+            const p = progress(queue);
+            detail = `${p.done} di ${p.total} · prossima: ${esc(queue.next.main.title)}`;
+            bar = progressBar(p.percent);
+        }
+    }
     return `<a class="artist-card" href="#/artista/${esc(a.id)}">
         ${photo(a.foto)}
-        <span class="artist-info"><strong>${esc(a.nome)}</strong>${detail ? `<span class="small">${detail}</span>` : ""}</span>
+        <span class="artist-info"><strong>${esc(a.nome)}</strong>${detail ? `<span class="small">${detail}</span>` : ""}${bar}</span>
         <span class="chevron" aria-hidden="true">›</span></a>`;
+}
+
+function progressBar(percent) {
+    return `<span class="progress" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><span style="width:${percent}%"></span></span>`;
+}
+
+function infoNotice() {
+    return infoMessage ? `<p class="notice">${esc(infoMessage)}</p>` : "";
 }
 
 /** Controllare and Recuperando: the artists in the list, with the button to add more. */
@@ -135,7 +156,7 @@ function listPage(lista, subtitle, icon, emptyText, emptyNote) {
     } else if (account.state !== "loading") {
         body += emptyState(icon, emptyText, emptyNote);
     }
-    return header(LISTS[lista].label, subtitle) + signInHint() + errorNotice() + body;
+    return header(LISTS[lista].label, subtitle) + signInHint() + errorNotice() + infoNotice() + body;
 }
 
 function pageControllare() {
@@ -235,11 +256,12 @@ function pageArtist(id) {
             <div><h1>${esc(a.nome)}</h1>${a.fan ? `<p class="subtitle">${esc(fansLabel(a.fan))}</p>` : ""}
             ${a.link ? `<p class="card-action"><a class="btn" href="${esc(a.link)}" target="_blank" rel="noopener">Apri su Deezer</a></p>` : ""}</div>
         </div>
-        ${errorNotice()}
+        ${errorNotice()}${infoNotice()}
+        ${a.lista === "recuperando" ? bookmarkSection(a) : ""}
         <h2>Lista</h2>
         <div class="segmented" role="group" aria-label="Lista">${choices}</div>
         <h2>Nota</h2>
-        <textarea id="nota" data-id="${esc(a.id)}" maxlength="500" rows="3" placeholder="Ad esempio: arrivato a «Take Over»">${esc(a.nota || "")}</textarea>
+        <textarea id="nota" data-id="${esc(a.id)}" maxlength="500" rows="3" placeholder="Ad esempio: aspetto il nuovo album">${esc(a.nota || "")}</textarea>
         <p class="small">La nota si salva da sola quando esci dalla casella.</p>
         ${discographySection(a)}
         <p class="page-actions"><button class="btn btn-danger" data-action="remove" data-id="${esc(a.id)}">Togli dalle liste</button></p>`;
@@ -286,7 +308,9 @@ function ensureDiscography(id, force = false) {
         // With a saved copy, keep showing it; otherwise explain
         Object.assign(entry, { state: entry.releases.length ? "ok" : "error", error: err.message, loading: false, failedAt: Date.now() });
     }).finally(() => {
-        if (currentView().key === "artista" && decodeURIComponent(route().path.slice("/artista/".length)) === id) render();
+        // Redraw where this discography is shown: its artist page, or the Recuperando list (progress)
+        const view = currentView().key;
+        if (view === "recuperando" || (view === "artista" && decodeURIComponent(route().path.slice("/artista/".length)) === id)) render();
     });
     return entry;
 }
@@ -312,7 +336,8 @@ function discographySection(a) {
             aria-pressed="${kind === key}">${esc(label)} <span class="count">${n}</span></button>`;
         const chips = [chip("", "Tutte", groups.length),
             ...Object.entries(KINDS).filter(([key]) => counts[key]).map(([key, k]) => chip(key, k.plural, counts[key]))].join("");
-        const rows = arrange(groups, kind, view.oldestFirst).map((g) => releaseRow(a, g)).join("");
+        const queue = a.lista === "recuperando" ? queueOf(groups, a.fatte || {}, kindsOf(a)) : null;
+        const rows = arrange(groups, kind, view.oldestFirst).map((g) => releaseRow(a, g, queue)).join("");
         const saved = entry.savedAt ? new Date(entry.savedAt) : null;
         const offline = entry.error ? ` · <span class="warn">Deezer non risponde: è la copia salvata</span>` : "";
         body = `<div class="chips" role="group" aria-label="Tipo di uscita">${chips}</div>
@@ -325,7 +350,20 @@ function discographySection(a) {
     return `<h2>Discografia</h2>${body}`;
 }
 
-function releaseRow(a, g) {
+/** In Recuperando, each release of the queue says whether it was listened to, with the button to change it. */
+function bookmarkMark(a, g, queue) {
+    if (!queue || !queue.all.includes(g)) return "";
+    const done = (a.fatte || {})[g.key];
+    const id = esc(a.id), key = esc(g.key);
+    if (done) {
+        const label = done.s === SKIPPED ? "Saltato" : "✓ Ascoltato";
+        return `<span class="mark-row"><span class="badge${done.s === SKIPPED ? " skipped" : ""}">${label}</span>
+            <button class="link-button" data-action="bm-unmark" data-id="${id}" data-key="${key}">annulla</button></span>`;
+    }
+    return `<span class="mark-row"><button class="link-button" data-action="bm-upto" data-id="${id}" data-key="${key}">Arrivato qui</button></span>`;
+}
+
+function releaseRow(a, g, queue = null) {
     const r = g.main;
     const cover = r.cover
         ? `<img class="cover" src="${esc(r.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
@@ -336,7 +374,7 @@ function releaseRow(a, g) {
         : "";
     return `<div class="release">${cover}
         <div class="release-info"><strong>${esc(r.title)}</strong>
-            <span class="small">${esc(KINDS[g.kind].label)} · ${esc(dateLabel(g.date))}${r.explicit ? " · 🅴" : ""}</span>${versions}</div>
+            <span class="small">${esc(KINDS[g.kind].label)} · ${esc(dateLabel(g.date))}${r.explicit ? " · 🅴" : ""}</span>${versions}${bookmarkMark(a, g, queue)}</div>
         <div class="release-actions">
             <a class="btn btn-small btn-primary" href="${esc(spotifySearchUrl(a.nome, r.title))}" target="_blank" rel="noopener">Spotify</a>
             <a class="btn btn-small" href="${esc(r.link)}" target="_blank" rel="noopener">Deezer</a>
@@ -353,6 +391,127 @@ function discographyAction(button) {
         ensureDiscography(a.id, true);
     }
     discographyView.set(a.id, view);
+    render();
+}
+
+// ------------------------------------------------------------------ bookmark (Recuperando)
+
+/** The kinds this artist's catch-up includes (saved per artist; compilations are out by default). */
+const kindsOf = (a) => (Array.isArray(a.tipi_recupero) && a.tipi_recupero.length ? a.tipi_recupero : DEFAULT_KINDS);
+
+/** The artist's discography as a queue (null while it is not loaded). */
+function artistQueue(a) {
+    const entry = ensureDiscography(a.id);
+    if (entry.state !== "ok") return { entry, queue: null };
+    return { entry, queue: queueOf(groupReleases(entry.releases, a.nome), a.fatte || {}, kindsOf(a)) };
+}
+
+function bookmarkSection(a) {
+    const { entry, queue } = artistQueue(a);
+    const id = esc(a.id);
+    let body;
+    if (!queue) {
+        body = entry.state === "error"
+            ? `<p class="error">Discografia non caricata: il segnalibro tornerà quando Deezer risponde.</p>`
+            : `<p class="small">Carico la discografia da Deezer…</p>`;
+    } else if (!queue.total) {
+        body = `<p class="small">Nessuna uscita da recuperare con i tipi scelti qui sotto.</p>`;
+    } else if (queue.finished) {
+        const undo = `<button class="link-button" data-action="bm-undo" data-id="${id}">↶ Annulla l'ultimo</button>`;
+        body = a.fine_tenuta
+            ? `<div class="card bookmark"><p><strong>Discografia finita 🎉</strong></p>
+                <p class="small">Resta in Recuperando: le uscite nuove compariranno qui, in fondo alla coda.</p>${undo}</div>`
+            : `<div class="card bookmark"><p><strong>Hai finito la discografia di ${esc(a.nome)} 🎉</strong></p>
+                <p class="small">Cosa ne facciamo?</p>
+                <p class="card-action button-row">
+                    <button class="btn btn-primary" data-action="bm-end" data-id="${id}" data-choice="controllare">Sposta in Controllare</button>
+                    <button class="btn" data-action="bm-end" data-id="${id}" data-choice="tieni">Tieni qui</button>
+                    <button class="btn" data-action="bm-end" data-id="${id}" data-choice="archivio">Archivia</button>
+                </p>${undo}</div>`;
+    } else {
+        const g = queue.next;
+        const r = g.main;
+        const p = progress(queue);
+        const cover = r.cover
+            ? `<img class="cover" src="${esc(r.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+            : `<span class="cover placeholder" aria-hidden="true">💿</span>`;
+        body = `<div class="card bookmark">
+            <p class="small">Prossima da ascoltare</p>
+            <div class="release next">${cover}
+                <div class="release-info"><strong>${esc(r.title)}</strong>
+                    <span class="small">${esc(KINDS[g.kind].label)} · ${esc(dateLabel(g.date))}</span></div>
+                <div class="release-actions">
+                    <a class="btn btn-small btn-primary" href="${esc(spotifySearchUrl(a.nome, r.title))}" target="_blank" rel="noopener">Spotify</a>
+                    <a class="btn btn-small" href="${esc(r.link)}" target="_blank" rel="noopener">Deezer</a>
+                </div></div>
+            <p class="card-action button-row">
+                <button class="btn btn-primary" data-action="bm-listened" data-id="${id}" data-key="${esc(g.key)}">✓ Ascoltato</button>
+                <button class="btn" data-action="bm-skip" data-id="${id}" data-key="${esc(g.key)}">Salta</button>
+                ${Object.keys(a.fatte || {}).length ? `<button class="btn" data-action="bm-undo" data-id="${id}">↶ Annulla l'ultimo</button>` : ""}
+            </p>
+            ${progressBar(p.percent)}
+            <p class="small">${p.done} di ${p.total} (${p.percent}%) · ascoltate ${queue.listened}, saltate ${queue.skipped}</p>
+        </div>`;
+    }
+    const kinds = kindsOf(a);
+    const kindChips = Object.entries(KINDS).map(([key, k]) =>
+        `<button class="chip${kinds.includes(key) ? " active" : ""}" data-action="bm-kind" data-id="${id}" data-kind="${key}" aria-pressed="${kinds.includes(key)}">${esc(k.plural)}</button>`).join("");
+    return `<h2>Segnalibro</h2>${body}
+        <details class="bookmark-settings"><summary>Cosa recuperare e cosa fare alla fine</summary>
+            <div class="chips" role="group" aria-label="Tipi da recuperare">${kindChips}</div>
+            <label class="check"><input type="checkbox" data-action="bm-auto" data-id="${id}"${a.auto_sposta ? " checked" : ""}>
+                Quando finisco, sposta in automatico in Controllare</label>
+            <p class="small">Per partire da dove sei arrivato, tocca «Arrivato qui» su un'uscita della discografia qui sotto.</p>
+        </details>`;
+}
+
+/** Ascoltato, Salta, Annulla, Arrivato qui, tipi, fine della discografia: saved in the artist's document. */
+async function bookmarkAction(target) {
+    const uid = account.user?.uid;
+    const a = savedArtist(target.dataset.id);
+    if (!uid || !a) return;
+    const { action, key, kind, choice } = target.dataset;
+    actionError = "";
+    infoMessage = "";
+    const fatte = a.fatte || {};
+    const fields = {};
+    if (action === "bm-listened") fields.fatte = mark(fatte, key, LISTENED);
+    else if (action === "bm-skip") fields.fatte = mark(fatte, key, SKIPPED);
+    else if (action === "bm-undo") fields.fatte = undoLast(fatte).fatte;
+    else if (action === "bm-unmark") fields.fatte = unmark(fatte, key);
+    else if (action === "bm-upto") {
+        const { queue } = artistQueue(a);
+        if (queue) fields.fatte = markUpTo(queue.all, key, fatte);
+    } else if (action === "bm-kind") {
+        const kinds = kindsOf(a);
+        const next = kinds.includes(kind) ? kinds.filter((k) => k !== kind) : [...kinds, kind];
+        if (!next.length) return; // at least one kind
+        fields.tipi_recupero = next;
+    } else if (action === "bm-auto") {
+        fields.auto_sposta = target.checked;
+    } else if (action === "bm-end") {
+        if (choice === "tieni") fields.fine_tenuta = true;
+        else {
+            fields.lista = choice;
+            fields.fine_tenuta = false;
+            infoMessage = `${a.nome} è passato in ${LISTS[choice].label}.`;
+        }
+    }
+    if (!Object.keys(fields).length) return;
+    // Just finished: with "sposta in automatico" the artist goes to Controllare at once
+    if (fields.fatte && a.auto_sposta) {
+        const { queue } = artistQueue({ ...a, fatte: fields.fatte });
+        if (queue?.finished) {
+            fields.lista = "controllare";
+            infoMessage = `Discografia finita: ${a.nome} è passato in Controllare.`;
+        }
+    }
+    try {
+        await updateArtist(uid, a.id, fields);
+    } catch (err) {
+        actionError = explainError(err);
+        infoMessage = "";
+    }
     render();
 }
 
@@ -545,6 +704,7 @@ function renderNav(active) {
 
 window.addEventListener("hashchange", () => {
     actionError = "";
+    infoMessage = "";
     const { path, params } = route();
     if (path === "/cerca" && params.get("q") === null && document.activeElement?.id !== "search") {
         // A new search starts empty
@@ -562,6 +722,7 @@ document.addEventListener("click", (e) => {
     if (["sign-in", "sign-out", "copy-uid"].includes(action)) accountAction(action);
     if (["add", "move", "remove"].includes(action)) artistAction(button);
     if (["disco-kind", "disco-order", "disco-reload"].includes(action)) discographyAction(button);
+    if (action.startsWith("bm-") && action !== "bm-auto") bookmarkAction(button);
     if (action === "install" && installPrompt) {
         installPrompt.prompt();
         installPrompt.userChoice.finally(() => { installPrompt = null; render(); });
@@ -576,6 +737,7 @@ document.addEventListener("input", (e) => {
 
 document.addEventListener("change", (e) => {
     if (e.target.id === "nota") saveNote(e.target);
+    if (e.target.dataset.action === "bm-auto") bookmarkAction(e.target);
 });
 
 document.addEventListener("focusout", (e) => {

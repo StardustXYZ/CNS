@@ -174,7 +174,7 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
 - [x] Doppioni uniti (`web/discografia.js`): remix, Deluxe/Edition, explicit/clean, versioni acustiche, live e strumentali, "feat." di altri finiscono sotto l'originale come "+N versioni". Un album e il singolo con lo stesso nome restano separati; un EP e la sua versione deluxe sono la stessa uscita. Sui dati veri: Ava Max da 114 a 51 uscite, Lady Gaga da 82 a 50.
 - [x] Pulsanti "Spotify" (ricerca artista + titolo) e "Deezer" (link esatto) su ogni uscita.
 - [x] Copia della discografia sul telefono: si apre subito e anche offline; si chiede di nuovo a Deezer dopo 6 ore.
-- [ ] Sul telefono.
+- [x] Sul telefono. **Riuscita il 13/11/2026.**
 - Da ricordare per la Fase 4: il controllo su GitHub dovrà usare le stesse regole per i doppioni (in Python), così una versione nuova di un'uscita già vista non arriva come "uscita nuova".
 
 ### Fase 4 – Controllare (il cuore)
@@ -184,12 +184,14 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
 - [ ] Notifica ntfy con titolo, tipo, copertina e pulsanti; più uscite insieme diventano una notifica sola.
 - [ ] Pagina "Novità": lo storico delle uscite notificate.
 
-### Fase 5 – Recuperando
-- [ ] Lista "Recuperando": per ogni artista la coda in ordine cronologico con il segnalibro.
-- [ ] Pulsanti Ascoltato (il segnalibro avanza) e Salta.
-- [ ] Le uscite nuove finiscono in fondo alla coda.
-- [ ] Fine della discografia: sposta in Controllare / tieni / archivia, più l'opzione "sposta in automatico".
-- [ ] Inserimento delle tue liste di esempio (Ava Max, Lady Gaga, Isabel LaRosa, Arctic Monkeys, K/DA; League of Legends fino a "Take Over", Amy Lee fino a "Aftermath").
+### Fase 5 – Recuperando (fatta prima della Fase 4, su tua scelta del 13/11/2026)
+- [x] Lista "Recuperando": per ogni artista "12 di 51 · prossima: …" con la barra di avanzamento.
+- [x] Pagina dell'artista: sezione "Segnalibro" con la prossima uscita (Spotify e Deezer), Ascoltato, Salta e "Annulla l'ultimo". Nella discografia ogni uscita mostra "✓ Ascoltato" / "Saltato" (con "annulla") oppure "Arrivato qui", che segna tutto fino a quella uscita.
+- [x] Le uscite nuove finiscono in fondo alla coda (sono le più recenti); un nuovo remix di un'uscita già ascoltata non torna nella coda.
+- [x] Cosa recuperare, per artista: Album, EP, Singoli, Featuring (di default) e Raccolte (escluse di default).
+- [x] Fine della discografia: sposta in Controllare / tieni qui / archivia, più l'opzione "sposta in automatico in Controllare".
+- [x] Logica in `web/segnalibro.js`, con 6 test. Il segnalibro è salvato su Firebase nel documento dell'artista (`fatte`), quindi vale su tutti i tuoi dispositivi.
+- [ ] Sul telefono: League of Legends fino a "Take Over" e Amy Lee fino a "Aftermath" con «Arrivato qui».
 
 ### Fase 6 – Anteprime
 - [ ] Prova di fattibilità di Deezer, iTunes e MusicBrainz sui tuoi artisti; si sceglie la fonte migliore.

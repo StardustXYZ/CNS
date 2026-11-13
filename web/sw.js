@@ -1,7 +1,7 @@
 // Service worker: CNS opens even without connection (from CNV's sw.js).
 // __BUILD__ is replaced at every build, so phones get the new app after an update.
 const CACHE = "cns-__BUILD__";
-const SHELL = ["./", "index.html", "app.js", "firebase.js", "deezer.js", "discografia.js", "style.css", "manifest.webmanifest",
+const SHELL = ["./", "index.html", "app.js", "firebase.js", "deezer.js", "discografia.js", "segnalibro.js", "style.css", "manifest.webmanifest",
     "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png"];
 // Photos and covers from Deezer get their own cache, kept across app updates
 const COVERS = "cns-covers";
