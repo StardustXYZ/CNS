@@ -60,6 +60,29 @@ export function watchDocument(path, onData, onError) {
     return storeMod.onSnapshot(storeMod.doc(db, path), (snap) => onData(snap.exists() ? snap.data() : null), onError);
 }
 
+// ------------------------------------------------------------------ settings and Novità
+
+/** Save the account's settings (e.g. {ntfy: "topic"}), keeping the other fields. */
+export async function saveSettings(uid, fields) {
+    const { db, storeMod } = sdk;
+    await storeMod.setDoc(storeMod.doc(db, `utenti/${uid}`), fields, { merge: true });
+}
+
+const NOVITA_SHOWN = 200; // the most recent ones are enough for the page
+
+/** Follow the account's Novità (written by GitHub), newest first. */
+export function watchNovita(uid, onData, onError) {
+    const { db, storeMod } = sdk;
+    const q = storeMod.query(storeMod.collection(db, `utenti/${uid}/novita`),
+        storeMod.orderBy("notificata", "desc"), storeMod.limit(NOVITA_SHOWN));
+    return storeMod.onSnapshot(q, (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), onError);
+}
+
+export async function removeNovita(uid, ids) {
+    const { db, storeMod } = sdk;
+    await Promise.all(ids.map((id) => storeMod.deleteDoc(storeMod.doc(db, `utenti/${uid}/novita/${id}`))));
+}
+
 // ------------------------------------------------------------------ artists (utenti/{uid}/artisti/{Deezer id})
 
 const artistsPath = (uid) => `utenti/${uid}/artisti`;

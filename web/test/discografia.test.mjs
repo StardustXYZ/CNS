@@ -88,3 +88,23 @@ test("date, link di Spotify e dati di Deezer", () => {
     const r = releaseFromApi({ id: 5, title: "X", release_date: "0000-00-00", record_type: "EP", cover_medium: "c", explicit_lyrics: true });
     assert.deepEqual(r, { id: "5", title: "X", type: "ep", date: "", cover: "c", link: "https://www.deezer.com/album/5", explicit: true });
 });
+
+// The same examples as tests/test_discografia.py: the app and the check on GitHub must agree
+import { readFileSync } from "node:fs";
+import { groupKey } from "../discografia.js";
+
+const CASES = JSON.parse(readFileSync(new URL("../../tests/fixtures/doppioni.json", import.meta.url), "utf8"));
+
+test("esempi condivisi con Python: titolo base", () => {
+    for (const [title, expected] of CASES.titolo_base) assert.equal(baseTitle(title), expected, title);
+});
+
+test("esempi condivisi con Python: featuring", () => {
+    for (const [title, artist, expected] of CASES.featuring) assert.equal(isFeaturing(title, artist), expected, title);
+});
+
+test("esempi condivisi con Python: chiave delle versioni", () => {
+    for (const [title, type, artist, expected] of CASES.chiave) {
+        assert.equal(groupKey(releaseFromApi({ id: 1, title, record_type: type }), artist), expected, title);
+    }
+});

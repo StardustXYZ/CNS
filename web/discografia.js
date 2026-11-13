@@ -59,14 +59,21 @@ export function kindOf(release, artistName) {
     return KINDS[release.type] ? release.type : "album";
 }
 
+/** The key shared by all the versions of a release (the same as group_key() in
+ * app/services/discografia.py, used by the check on GitHub). */
+export function groupKey(release, artistName) {
+    const kind = kindOf(release, artistName);
+    const family = kind === "ep" ? "album" : kind; // an EP and its deluxe album are the same release
+    return `${family}|${normalize(baseTitle(release.title))}`;
+}
+
 /** Merge the versions: same title without the version marks, same kind (an album and the
  * single with its name stay apart). The original is the one without marks, else the oldest. */
 export function groupReleases(releases, artistName) {
     const groups = new Map();
     for (const r of releases) {
         const kind = kindOf(r, artistName);
-        const family = kind === "ep" ? "album" : kind; // an EP and its deluxe album are the same release
-        const key = `${family}|${normalize(baseTitle(r.title))}`;
+        const key = groupKey(r, artistName);
         if (!groups.has(key)) groups.set(key, { key, kind, releases: [] });
         groups.get(key).releases.push(r);
     }

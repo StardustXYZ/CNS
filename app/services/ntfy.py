@@ -109,6 +109,22 @@ def release_notification(
     )
 
 
+def summary_notification(items: list[tuple[str, DeezerRelease]], now: datetime, app_url: str = settings.APP_URL) -> Notification:
+    """One notification for many new releases: "5 uscite nuove", touching it opens Novità."""
+    lines = [f"{artist}: {release.title}" for artist, release in items[:8]]
+    if len(items) > 8:
+        lines.append(f"…e altre {len(items) - 8}")
+    artists = list(dict.fromkeys(artist for artist, _ in items))
+    novita = app_url.rstrip("/") + "/#/novita"
+    return Notification(
+        title=f"{len(items)} uscite nuove: {', '.join(artists[:3])}{'…' if len(artists) > 3 else ''}",
+        message="\n".join(lines),
+        click=novita,
+        actions=(("Apri le Novità", novita),),
+        priority=PRIORITY_QUIET if is_quiet(now) else PRIORITY_DEFAULT,
+    )
+
+
 class NotificationSender(Protocol):
     """Anything that can deliver a notification (the real ntfy client or a test fake)."""
 

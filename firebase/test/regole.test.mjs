@@ -76,3 +76,29 @@ test("le raccolte non previste sono chiuse a tutti", async () => {
     await assertFails(setDoc(doc(as("vincenzo"), "utenti/vincenzo/altro/1"), { x: 1 }));
     await assertFails(setDoc(doc(as("vincenzo"), "qualcosa/1"), { x: 1 }));
 });
+
+test("l'argomento ntfy si salva solo se è un nome valido", async () => {
+    const db = as("vincenzo");
+    await assertSucceeds(setDoc(doc(db, "utenti/vincenzo"), { ntfy: "cns-AbC_123-xyz" }));
+    await assertSucceeds(setDoc(doc(db, "utenti/vincenzo"), { ntfy: "" }));
+    await assertFails(setDoc(doc(db, "utenti/vincenzo"), { ntfy: "https://ntfy.sh/cns" }));
+    await assertFails(setDoc(doc(db, "utenti/vincenzo"), { ntfy: "con spazi" }));
+    await assertFails(setDoc(doc(db, "utenti/vincenzo"), { ntfy: "x".repeat(65) }));
+    await assertFails(setDoc(doc(as("amico"), "utenti/vincenzo"), { ntfy: "rubato" }));
+});
+
+test("le Novità le scrive solo GitHub: si leggono e si cancellano, non si scrivono", async () => {
+    await seed("utenti/vincenzo/novita/1139685681", { titolo: "Christmas Wonderland" });
+    const db = as("vincenzo");
+    await assertSucceeds(getDoc(doc(db, "utenti/vincenzo/novita/1139685681")));
+    await assertSucceeds(getDocs(collection(db, "utenti/vincenzo/novita")));
+    await assertFails(setDoc(doc(db, "utenti/vincenzo/novita/1"), { titolo: "Falsa" }));
+    await assertFails(getDocs(collection(as("amico"), "utenti/vincenzo/novita")));
+    await assertSucceeds(deleteDoc(doc(db, "utenti/vincenzo/novita/1139685681")));
+});
+
+test("le uscite già viste (visti) restano chiuse all'app", async () => {
+    await seed("visti/12948083", { ids: ["1"] });
+    await assertFails(getDoc(doc(as("vincenzo"), "visti/12948083")));
+    await assertFails(setDoc(doc(as("vincenzo"), "visti/12948083"), { ids: [] }));
+});

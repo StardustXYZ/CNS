@@ -7,8 +7,8 @@ import { artistIdFromLink, fansLabel, getArtist, getDiscography, searchArtists }
 import { KINDS, arrange, countKinds, dateLabel, groupReleases, releaseFromApi, spotifySearchUrl } from "./discografia.js";
 import { DEFAULT_KINDS, LISTENED, SKIPPED, mark, markUpTo, progress, queueOf, undoLast, unmark } from "./segnalibro.js";
 import {
-    addArtist, explainError, removeArtist, signIn, signOutUser, startFirebase, updateArtist,
-    watchArtists, watchDocument,
+    addArtist, explainError, removeArtist, removeNovita, saveSettings, signIn, signOutUser, startFirebase,
+    updateArtist, watchArtists, watchDocument, watchNovita,
 } from "./firebase.js";
 
 const BUILD = "__BUILD__"; // replaced by app/build_site.py with the build time
@@ -38,6 +38,13 @@ const account = { state: "loading", user: null, error: "", busy: false };
 let github = { state: "idle", data: null, error: "" };
 // The account's artists: state "idle" | "loading" | "ok" | "error"
 let artists = { state: "idle", list: [], error: "" };
+// The account's settings (utenti/{uid}: the ntfy topic) and its Novità (written by GitHub)
+let userSettings = { state: "idle", data: {}, error: "" };
+let novita = { state: "idle", list: [], error: "" };
+const ntfyTest = { state: "", message: "" }; // "Manda una prova": "" | "sending" | "ok" | "error"
+let ntfyDraft = null; // what is being typed in the topic box (kept when the page is redrawn)
+const NOVITA_SEEN_KEY = "cns.novita.vista"; // when Novità was last opened on this phone (for the menu count)
+const TOPIC_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 let stopWatching = [];
 let copied = false; // "Copia codice" was just pressed
 // Search on Deezer: state "idle" | "loading" | "ok" | "error"
@@ -176,9 +183,48 @@ function pageRecuperando() {
 }
 
 function pageNovita() {
-    return header("Novità", "Lo storico delle uscite che ti sono state notificate.")
-        + emptyState("🔔", "Nessuna novità per ora.",
-            "Le uscite nuove degli artisti in Controllare compariranno qui, dalla più recente.");
+    let body = signInHint();
+    if (account.user) {
+        if (novita.state === "error") body += `<p class="notice notice-error">${esc(novita.error)}</p>`;
+        else if (novita.state === "loading" && !novita.list.length) body += `<p class="small">Caricamento…</p>`;
+        else if (!novita.list.length) {
+            body += emptyState("🔔", "Nessuna novità per ora.",
+                "Quando un artista di Controllare pubblica qualcosa, la trovi qui (e ti arriva la notifica).");
+        } else {
+            body += `<div class="release-list">${novita.list.map(novitaRow).join("")}</div>
+                <p class="page-actions"><button class="btn btn-danger" data-action="novita-clear">Svuota le Novità</button></p>`;
+        }
+        if (!TOPIC_PATTERN.test(userSettings.data.ntfy || "") && userSettings.state === "ok") {
+            body = `<p class="notice">Per ricevere le notifiche sul telefono scrivi il tuo argomento ntfy in <a href="#/impostazioni">Impostazioni</a>.</p>` + body;
+        }
+    }
+    return header("Novità", "Le uscite nuove degli artisti in Controllare, dalla più recente.") + body;
+}
+
+function novitaRow(n) {
+    const cover = n.copertina
+        ? `<img class="cover" src="${esc(n.copertina)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+        : `<span class="cover placeholder" aria-hidden="true">💿</span>`;
+    const when = n.notificata?.toDate?.();
+    return `<div class="release">${cover}
+        <div class="release-info"><strong>${esc(n.titolo)}</strong>
+            <span class="small"><a href="#/artista/${esc(n.artista_id)}">${esc(n.artista)}</a> · ${esc(KINDS[n.tipo]?.label || "Uscita")} · ${esc(dateLabel(n.data))}</span>
+            ${when ? `<span class="small">notificata il ${esc(dateTime(when))}</span>` : ""}</div>
+        <div class="release-actions">
+            <a class="btn btn-small btn-primary" href="${esc(n.spotify || spotifySearchUrl(n.artista, n.titolo))}" target="_blank" rel="noopener">Spotify</a>
+            ${n.link ? `<a class="btn btn-small" href="${esc(n.link)}" target="_blank" rel="noopener">Deezer</a>` : ""}
+        </div></div>`;
+}
+
+/** How many Novità arrived since the page was last opened on this phone. */
+function unseenNovita() {
+    let seen = 0;
+    try { seen = Number(localStorage.getItem(NOVITA_SEEN_KEY)) || 0; } catch { /* private mode */ }
+    return novita.list.filter((n) => (n.notificata?.toMillis?.() || 0) > seen).length;
+}
+
+function markNovitaSeen() {
+    try { localStorage.setItem(NOVITA_SEEN_KEY, String(Date.now())); } catch { /* private mode */ }
 }
 
 // ------------------------------------------------------------------ search
@@ -258,6 +304,7 @@ function pageArtist(id) {
         </div>
         ${errorNotice()}${infoNotice()}
         ${a.lista === "recuperando" ? bookmarkSection(a) : ""}
+        ${a.lista === "controllare" ? alertsSection(a) : ""}
         <h2>Lista</h2>
         <div class="segmented" role="group" aria-label="Lista">${choices}</div>
         <h2>Nota</h2>
@@ -515,6 +562,109 @@ async function bookmarkAction(target) {
     render();
 }
 
+// ------------------------------------------------------------------ alerts (Controllare)
+
+/** The kinds of release this person is told about for this artist (all, unless changed). */
+const alertKindsOf = (a) => (Array.isArray(a.tipi_avviso) && a.tipi_avviso.length ? a.tipi_avviso : Object.keys(KINDS));
+
+function alertsSection(a) {
+    const kinds = alertKindsOf(a);
+    const chips = Object.entries(KINDS).map(([key, k]) =>
+        `<button class="chip${kinds.includes(key) ? " active" : ""}" data-action="alert-kind" data-id="${esc(a.id)}" data-kind="${key}" aria-pressed="${kinds.includes(key)}">${esc(k.plural)}</button>`).join("");
+    return `<h2>Avvisi</h2>
+        <div class="chips" role="group" aria-label="Tipi di uscita da segnalare">${chips}</div>
+        <p class="small">Ti arriva una notifica quando ${esc(a.nome)} pubblica un'uscita di questi tipi.</p>`;
+}
+
+async function alertAction(button) {
+    const uid = account.user?.uid;
+    const a = savedArtist(button.dataset.id);
+    if (!uid || !a) return;
+    const kinds = alertKindsOf(a);
+    const kind = button.dataset.kind;
+    const next = kinds.includes(kind) ? kinds.filter((k) => k !== kind) : [...kinds, kind];
+    if (!next.length) return; // at least one kind: to get none, move the artist to Recuperando or Archivio
+    actionError = "";
+    try {
+        await updateArtist(uid, a.id, { tipi_avviso: next });
+    } catch (err) {
+        actionError = explainError(err);
+        render();
+    }
+}
+
+// ------------------------------------------------------------------ notifications (Impostazioni)
+
+function ntfyCard() {
+    if (!account.user) return "";
+    const saved = userSettings.data.ntfy || "";
+    const topic = ntfyDraft ?? saved;
+    const status = ntfyTest.state === "sending" ? `<p class="small">Invio…</p>`
+        : ntfyTest.state === "ok" ? `<p class="badge">${esc(ntfyTest.message)}</p>`
+        : ntfyTest.state === "error" ? `<p class="error">${esc(ntfyTest.message)}</p>` : "";
+    return `<div class="card">
+        <label for="ntfy-topic"><strong>Argomento ntfy</strong></label>
+        <p class="small">Il nome dell'argomento a cui è iscritta l'app ntfy sul tuo telefono (solo il nome, senza https://ntfy.sh/). Chi lo conosce può leggere le tue notifiche: tienilo lungo e casuale.</p>
+        <input type="text" id="ntfy-topic" value="${esc(topic)}" placeholder="ad esempio cns-x7Kp2…" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="64">
+        <p class="card-action button-row">
+            <button class="btn btn-primary" data-action="ntfy-save">Salva</button>
+            <button class="btn" data-action="ntfy-test"${TOPIC_PATTERN.test(saved) && topic === saved ? "" : " disabled"}>Manda una prova</button>
+        </p>${status}</div>`;
+}
+
+async function ntfyAction(action) {
+    const uid = account.user?.uid;
+    if (!uid) return;
+    const box = document.getElementById("ntfy-topic");
+    if (action === "ntfy-save") {
+        const topic = (ntfyDraft ?? box?.value ?? "").trim().replace(/^https?:\/\/ntfy\.sh\//, "");
+        if (topic && !TOPIC_PATTERN.test(topic)) {
+            Object.assign(ntfyTest, { state: "error", message: "Solo lettere, cifre, - e _ (massimo 64)." });
+            render();
+            return;
+        }
+        try {
+            await saveSettings(uid, { ntfy: topic });
+            ntfyDraft = null;
+            Object.assign(ntfyTest,{ state: "ok", message: topic ? "Salvato ✓" : "Argomento tolto: le uscite nuove resteranno solo in Novità." });
+        } catch (err) {
+            Object.assign(ntfyTest, { state: "error", message: explainError(err) });
+        }
+        box?.blur();
+        render();
+        return;
+    }
+    // "Manda una prova": straight from the phone to ntfy, as GitHub will do
+    Object.assign(ntfyTest, { state: "sending", message: "" });
+    render();
+    try {
+        const resp = await fetch("https://ntfy.sh/", {
+            method: "POST",
+            body: JSON.stringify({
+                topic: userSettings.data.ntfy, title: "CNS", tags: ["headphones"],
+                message: "Le notifiche funzionano: ti scrivo quando un artista di Controllare pubblica qualcosa.",
+            }),
+        });
+        if (!resp.ok) throw new Error(`ntfy ha risposto ${resp.status}`);
+        Object.assign(ntfyTest, { state: "ok", message: "Prova inviata: controlla il telefono ✓" });
+    } catch (err) {
+        Object.assign(ntfyTest, { state: "error", message: `Prova non inviata: ${err.message}` });
+    }
+    render();
+}
+
+async function clearNovita() {
+    const uid = account.user?.uid;
+    if (!uid || !novita.list.length) return;
+    if (!confirm(`Cancellare tutte le ${novita.list.length} Novità? Le uscite restano nella discografia degli artisti.`)) return;
+    try {
+        await removeNovita(uid, novita.list.map((n) => n.id));
+    } catch (err) {
+        novita.error = explainError(err);
+        render();
+    }
+}
+
 // ------------------------------------------------------------------ account (Impostazioni)
 
 function pageImpostazioni() {
@@ -524,14 +674,15 @@ function pageImpostazioni() {
     return header("Impostazioni", "Il tuo account, le notifiche e l'app.")
         + `<h2>Account</h2>${accountCard()}${githubCard()}
         <h2>Notifiche</h2>
+        ${ntfyCard()}
         <div class="card"><ul class="settings-list">
             <li><span>Controllo delle uscite</span><span class="value">ogni 3 ore</span></li>
+            <li><span>Per chi</span><span class="value">gli artisti in Controllare</span></li>
             <li><span>Di notte</span><span class="value">dalle 23 alle 8 senza suono</span></li>
             <li><span>Più di 3 uscite insieme</span><span class="value">una notifica sola</span></li>
-            <li><span>Featuring</span><span class="value">segnalati</span></li>
-            <li><span>Copertina</span><span class="value">piccola, con tre pulsanti</span></li>
+            <li><span>Tipi di uscita</span><span class="value">tutti; si cambiano nella pagina dell'artista</span></li>
+            <li><span>Artista appena aggiunto</span><span class="value">la prima volta nessun avviso</span></li>
         </ul></div>
-        <p class="small">Per ora queste regole sono fisse; più avanti si potranno cambiare da qui.</p>
         <h2>App</h2>
         <div class="card"><ul class="settings-list">
             <li><span>Versione</span><span class="value">${esc(buildLabel())}</span></li>
@@ -592,7 +743,15 @@ function followAccount() {
     const uid = account.user?.uid;
     github = { state: uid ? "loading" : "idle", data: null, error: "" };
     artists = { state: uid ? "loading" : "idle", list: [], error: "" };
+    userSettings = { state: uid ? "loading" : "idle", data: {}, error: "" };
+    novita = { state: uid ? "loading" : "idle", list: [], error: "" };
     if (!uid) return;
+    stopWatching.push(watchDocument(`utenti/${uid}`,
+        (data) => { userSettings = { state: "ok", data: data || {}, error: "" }; render(); },
+        (err) => { userSettings = { state: "error", data: {}, error: explainError(err) }; render(); }));
+    stopWatching.push(watchNovita(uid,
+        (list) => { novita = { state: "ok", list, error: "" }; if (currentView().key === "novita") markNovitaSeen(); render(); },
+        (err) => { novita = { state: "error", list: [], error: explainError(err) }; render(); }));
     stopWatching.push(watchDocument("stato/github",
         (data) => { github = { state: "ok", data, error: "" }; render(); },
         (err) => { github = { state: "error", data: null, error: explainError(err) }; render(); }));
@@ -673,8 +832,8 @@ function render() {
     if (typing?.id === "search" && view.key === "cerca" && app.querySelector("#results")) {
         // Typing a search: redraw only the results, so the box keeps the focus and the keyboard
         app.querySelector("#results").innerHTML = searchResults(route().params.get("lista") === "recuperando" ? "recuperando" : "controllare");
-    } else if (typing?.id === "nota" && view.key === "artista") {
-        // Writing a note: leave the page as it is until the box is left
+    } else if ((typing?.id === "nota" && view.key === "artista") || (typing?.id === "ntfy-topic" && view.key === "impostazioni")) {
+        // Writing in a box: leave the page as it is until the box is left
     } else {
         app.innerHTML = view.render();
         if (swipeDirection) {
@@ -689,7 +848,10 @@ function render() {
 }
 
 function renderNav(active) {
-    const counts = account.user ? { controllare: inList("controllare").length, recuperando: inList("recuperando").length } : {};
+    if (active === "novita") markNovitaSeen();
+    const counts = account.user
+        ? { controllare: inList("controllare").length, recuperando: inList("recuperando").length, novita: unseenNovita() }
+        : {};
     const nav = document.getElementById("nav-links");
     nav.innerHTML = PAGES.map((p) => {
         const n = counts[p.key];
@@ -723,6 +885,9 @@ document.addEventListener("click", (e) => {
     if (["add", "move", "remove"].includes(action)) artistAction(button);
     if (["disco-kind", "disco-order", "disco-reload"].includes(action)) discographyAction(button);
     if (action.startsWith("bm-") && action !== "bm-auto") bookmarkAction(button);
+    if (action === "alert-kind") alertAction(button);
+    if (action === "ntfy-save" || action === "ntfy-test") ntfyAction(action);
+    if (action === "novita-clear") clearNovita();
     if (action === "install" && installPrompt) {
         installPrompt.prompt();
         installPrompt.userChoice.finally(() => { installPrompt = null; render(); });
@@ -730,6 +895,7 @@ document.addEventListener("click", (e) => {
 });
 
 document.addEventListener("input", (e) => {
+    if (e.target.id === "ntfy-topic") ntfyDraft = e.target.value;
     if (e.target.id !== "search") return;
     search.query = e.target.value;
     scheduleSearch();
@@ -742,7 +908,7 @@ document.addEventListener("change", (e) => {
 
 document.addEventListener("focusout", (e) => {
     // After leaving the note box, draw the page again with what was saved
-    if (e.target.id === "nota") setTimeout(render, 0);
+    if (e.target.id === "nota" || e.target.id === "ntfy-topic") setTimeout(render, 0);
 });
 
 window.addEventListener("beforeinstallprompt", (e) => {

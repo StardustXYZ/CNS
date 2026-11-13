@@ -1,0 +1,39 @@
+{
+  "_nota": "Esempi condivisi: li usano sia web/test/discografia.test.mjs sia tests/test_discografia.py, così l'app e il controllo su GitHub uniscono i doppioni allo stesso modo. Titoli veri di Deezer (novembre 2026).",
+  "titolo_base": [
+    ["Sweet but Psycho (Leon Lour Remix)", "Sweet but Psycho"],
+    ["Sweet but Psycho (The Remixes)", "Sweet but Psycho"],
+    ["So Am I (Analog Acoustic)", "So Am I"],
+    ["So Am I (Steve Void Extended Mix)", "So Am I"],
+    ["So Am I (feat. NCT 127)", "So Am I"],
+    ["Torn (Cirkut DJ Mix)", "Torn"],
+    ["Born This Way (International Special Edition Version)", "Born This Way"],
+    ["Chromatica [Deluxe]", "Chromatica"],
+    ["Alone, Pt. II (Live at Château de Fontainebleau)", "Alone, Pt. II"],
+    ["Heaven & Hell - Deluxe Edition", "Heaven & Hell"],
+    ["Top Gun: Maverick (Music From The Motion Picture)", "Top Gun: Maverick (Music From The Motion Picture)"],
+    ["Arcane League of Legends (Soundtrack from the Animated Series)", "Arcane League of Legends (Soundtrack from the Animated Series)"],
+    ["Ignite (2026)", "Ignite (2026)"],
+    ["(Remix)", "(Remix)"]
+  ],
+  "featuring": [
+    ["BURN (feat. Ava Max)", "Ava Max", true],
+    ["Brought The Heat Back (Feat. Ava Max)", "Ava Max", true],
+    ["Duet (with Ava Max)", "Ava Max", true],
+    ["Song ft. Ava Max & Someone", "Ava Max", true],
+    ["Kings & Queens, Pt. 2 (feat. Lauv & Saweetie)", "Ava Max", false],
+    ["Song (feat. Ava Maxwell)", "Ava Max", false],
+    ["Sweet but Psycho", "Ava Max", false]
+  ],
+  "chiave": [
+    ["Sweet but Psycho (Paul Morrell Remix)", "single", "Ava Max", "single|sweet but psycho"],
+    ["Sweet but Psycho", "single", "Ava Max", "single|sweet but psycho"],
+    ["Heaven & Hell (Deluxe)", "album", "Ava Max", "album|heaven hell"],
+    ["Heaven & Hell", "single", "Ava Max", "single|heaven hell"],
+    ["Diamonds & Dancefloors", "ep", "Ava Max", "album|diamonds dancefloors"],
+    ["BURN (feat. Ava Max)", "single", "Ava Max", "featuring|burn"],
+    ["Worlds Collection", "compile", "League of Legends", "compile|worlds collection"],
+    ["K/DA - ALL OUT", "ep", "K/DA", "album|k da all out"],
+    ["Beyoncé", "boh", "Qualcuno", "album|beyonce"]
+  ]
+}

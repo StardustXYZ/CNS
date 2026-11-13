@@ -178,11 +178,15 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
 - Da ricordare per la Fase 4: il controllo su GitHub dovrà usare le stesse regole per i doppioni (in Python), così una versione nuova di un'uscita già vista non arriva come "uscita nuova".
 
 ### Fase 4 – Controllare (il cuore)
-- [ ] Lista "Controllare" con la nota per artista e i tipi da segnalare (tutti accesi di default, featuring compresi).
-- [ ] Controllo su GitHub ogni poche ore: uscite nuove rispetto a quelle già viste.
-- [ ] **Prima esecuzione silenziosa** per ogni artista appena aggiunto: segna tutto come visto, senza notifiche.
-- [ ] Notifica ntfy con titolo, tipo, copertina e pulsanti; più uscite insieme diventano una notifica sola.
-- [ ] Pagina "Novità": lo storico delle uscite notificate.
+- [x] Nella pagina di un artista in Controllare, "Avvisi": i tipi da segnalare (tutti accesi di default, featuring compresi).
+- [x] Controllo su GitHub ogni 3 ore (`app/controllo.py`): per ogni artista la discografia di Deezer confrontata con le uscite già viste (`visti/<codice Deezer>`, chiuso all'app). Un artista seguito da più persone si chiede a Deezer una volta sola.
+- [x] **Prima volta silenziosa**: un artista mai controllato prima diventa "già visto" per intero, senza notifiche.
+- [x] Non sono uscite nuove: le versioni di un'uscita già vista (remix, deluxe…: stesse regole dell'app, in `app/services/discografia.py`, con esempi condivisi tra Python e JavaScript in `tests/fixtures/doppioni.json`) e le uscite più vecchie di 30 giorni che Deezer aggiunge al catalogo in ritardo.
+- [x] Notifiche solo per gli artisti in Controllare (in Recuperando l'uscita va in fondo alla coda), sull'argomento ntfy di ogni persona (Impostazioni, con "Manda una prova"). Fino a 3 uscite una notifica ciascuna; da 4 in su una sola che apre le Novità. Di notte senza suono.
+- [x] Pagina "Novità": lo storico delle uscite notificate, con Spotify e Deezer, il contatore nel menu delle nuove e "Svuota le Novità". Senza argomento ntfy le uscite arrivano solo qui.
+- [x] Regole di Firebase: Novità leggibili e cancellabili ma scritte solo da GitHub; argomento ntfy controllato (10 prove sull'emulatore). **Vanno incollate di nuovo nella console.**
+- [x] Prova completa sull'emulatore con il Deezer vero: primo giro silenzioso (114 uscite di Ava Max ricordate), uscita nuova simulata → Novità e notifica all'argomento giusto, terzo giro senza ripetizioni.
+- [ ] Sul telefono: regole incollate, argomento ntfy in Impostazioni con "Manda una prova", primo giro silenzioso su GitHub.
 
 ### Fase 5 – Recuperando (fatta prima della Fase 4, su tua scelta del 13/11/2026)
 - [x] Lista "Recuperando": per ogni artista "12 di 51 · prossima: …" con la barra di avanzamento.
@@ -191,7 +195,7 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
 - [x] Cosa recuperare, per artista: Album, EP, Singoli, Featuring (di default) e Raccolte (escluse di default).
 - [x] Fine della discografia: sposta in Controllare / tieni qui / archivia, più l'opzione "sposta in automatico in Controllare".
 - [x] Logica in `web/segnalibro.js`, con 6 test. Il segnalibro è salvato su Firebase nel documento dell'artista (`fatte`), quindi vale su tutti i tuoi dispositivi.
-- [ ] Sul telefono: League of Legends fino a "Take Over" e Amy Lee fino a "Aftermath" con «Arrivato qui».
+- [x] Sul telefono: League of Legends fino a "Take Over" e Amy Lee fino a "Aftermath" con «Arrivato qui». **Riuscita il 13/11/2026.**
 
 ### Fase 6 – Anteprime
 - [ ] Prova di fattibilità di Deezer, iTunes e MusicBrainz sui tuoi artisti; si sceglie la fonte migliore.

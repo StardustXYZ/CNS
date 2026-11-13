@@ -169,7 +169,7 @@ a.artist-card:hover { background: var(--surface-2); }
 .segmented { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .segmented .btn.active { background: var(--green); border-color: var(--green); color: #fff; font-weight: 600; }
 
-input[type="search"], textarea {
+input[type="search"], input[type="text"], textarea {
     width: 100%;
     padding: 0.65rem 0.8rem;
     font: inherit;
@@ -178,7 +178,7 @@ input[type="search"], textarea {
     border: 1px solid var(--border);
     border-radius: var(--radius);
 }
-input[type="search"]:focus, textarea:focus { outline: 2px solid var(--green); outline-offset: 1px; border-color: var(--green); }
+input[type="search"]:focus, input[type="text"]:focus, textarea:focus { outline: 2px solid var(--green); outline-offset: 1px; border-color: var(--green); }
 textarea { resize: vertical; }
 #results { margin-top: 0.9rem; }
 .search-hint { text-align: center; padding: 1rem 0; }
