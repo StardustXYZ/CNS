@@ -203,9 +203,12 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
   - **Deezer**: non mostra le uscite future;
   - **MusicBrainz**: rifiuta quasi tutte le richieste anonime (errore 503); servirebbe mandargli un contatto.
 - [x] Client iTunes (`app/services/itunes.py`): circa 20 chiamate al minuto come chiede Apple; l'artista giusto è quello con il nome uguale e più titoli in comune con Deezer (cinque "Justice" su iTunes). Se il nome su iTunes è più lungo ("League of Legends Music") vale solo con almeno 3 titoli in comune. Dal PC: tutti e 9 gli artisti abbinati giusti.
-- [ ] Prova da GitHub ("Prova iTunes"): Apple risponde anche dai server di GitHub?
-- [ ] Nel controllo ogni 3 ore: notifica "In arrivo: … esce il …" una volta sola, promemoria "Esce oggi" il giorno dell'uscita, niente doppione quando l'uscita arriva su Deezer.
-- [ ] Nell'app: "In arrivo" in cima a Novità e nella pagina dell'artista.
+- [x] Prova da GitHub ("Prova iTunes"): **riuscita il 13/11/2026**, Apple risponde anche dai server di GitHub, tutti e 9 gli artisti letti.
+- [x] Nel controllo ogni 3 ore (`app/anteprime.py`), per gli artisti in Controllare e i tipi scelti negli Avvisi: notifica "In arrivo: … esce il …" una volta sola; se la data cambia si aggiorna senza un'altra notifica; promemoria "Esce oggi" il giorno dell'uscita; quando poi l'uscita arriva su Deezer niente seconda notifica (resta nello storico delle Novità); una settimana dopo l'annuncio sparisce. L'abbinamento con iTunes si salva e, se non c'è, si riprova dopo 7 giorni.
+- [x] Nell'app: "In arrivo" in cima a Novità e nella pagina dell'artista, con "esce il … (tra N giorni)", Apple Music e, il giorno dell'uscita, Spotify.
+- [x] Regole di Firebase: anteprime scritte solo da GitHub (11 prove). **Vanno incollate di nuovo nella console.**
+- [x] Prova sull'emulatore con Deezer e iTunes veri: ENHYPEN e Justice in Controllare → due notifiche "In arrivo" (20/11 e 11/12), nessuna ripetizione al secondo giro, sezione "In arrivo" nell'app.
+- [ ] Sul telefono, dopo la pubblicazione.
 
 ### Fase 7 – Rifiniture
 - [ ] Copia di sicurezza ed esportazione delle liste in JSON.

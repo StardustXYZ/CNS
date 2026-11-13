@@ -298,3 +298,8 @@ textarea { resize: vertical; }
 .bookmark-settings summary { cursor: pointer; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
 .check { display: flex; gap: 0.5rem; align-items: center; margin: 0.5rem 0; }
 .check input { width: 1.1rem; height: 1.1rem; accent-color: var(--green); }
+
+/* ---- In arrivo (announced releases) ---- */
+.release.coming { border-left: 3px solid var(--green); }
+.release.coming .when { color: var(--accent); font-size: 0.85rem; font-weight: 600; }
+.release.coming.today { background: var(--surface-2); }

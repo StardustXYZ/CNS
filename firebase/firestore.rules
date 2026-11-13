@@ -30,6 +30,12 @@ service cloud.firestore {
       allow create, update: if false;
     }
 
+    // In arrivo: the announced releases (iTunes pre-orders) GitHub found. Same as Novità
+    match /utenti/{uid}/anteprime/{releaseId} {
+      allow read, delete: if isUser(uid);
+      allow create, update: if false;
+    }
+
     // Written by GitHub; any signed-in account can see when GitHub last got in touch
     match /stato/{doc} {
       allow read: if request.auth != null;

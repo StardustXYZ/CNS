@@ -135,6 +135,8 @@ class DocumentStore(Protocol):
 
     async def collection_group(self, collection_id: str) -> list[tuple[str, dict]]: ...
 
+    async def delete(self, path: str) -> None: ...
+
 
 class FirestoreClient:
     """Async Firestore client. Use as ``async with FirestoreClient.from_settings() as db: ...``.
@@ -205,6 +207,10 @@ class FirestoreClient:
         resp = await self._request("PATCH", path, json={"fields": encode_fields(data)})
         if resp.status_code == 404:
             raise FirestoreError(f"percorso non valido: {path}")
+
+    async def delete(self, path: str) -> None:
+        """Remove the document (nothing happens if it does not exist)."""
+        await self._request("DELETE", path)
 
     async def collection_group(self, collection_id: str) -> list[tuple[str, dict]]:
         """Every document in every collection called ``collection_id``, wherever it is

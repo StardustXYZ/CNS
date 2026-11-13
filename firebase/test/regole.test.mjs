@@ -102,3 +102,11 @@ test("le uscite già viste (visti) restano chiuse all'app", async () => {
     await assertFails(getDoc(doc(as("vincenzo"), "visti/12948083")));
     await assertFails(setDoc(doc(as("vincenzo"), "visti/12948083"), { ids: [] }));
 });
+
+test("le uscite in arrivo le scrive solo GitHub: si leggono, non si scrivono, gli altri non le vedono", async () => {
+    await seed("utenti/vincenzo/anteprime/950", { titolo: "Nuovo Album", data: "2026-12-04" });
+    const db = as("vincenzo");
+    await assertSucceeds(getDocs(collection(db, "utenti/vincenzo/anteprime")));
+    await assertFails(setDoc(doc(db, "utenti/vincenzo/anteprime/951"), { titolo: "Falsa" }));
+    await assertFails(getDocs(collection(as("amico"), "utenti/vincenzo/anteprime")));
+});

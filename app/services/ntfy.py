@@ -9,7 +9,7 @@ arrives without sound.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import Protocol
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
@@ -123,6 +123,53 @@ def summary_notification(items: list[tuple[str, DeezerRelease]], now: datetime, 
         actions=(("Apri le Novità", novita),),
         priority=PRIORITY_QUIET if is_quiet(now) else PRIORITY_DEFAULT,
     )
+
+
+KIND_LABELS = {"album": "Album", "ep": "EP", "single": "Singolo", "featuring": "Featuring", "compile": "Raccolta"}
+
+
+def _novita_url(app_url: str) -> str:
+    return app_url.rstrip("/") + "/#/novita"
+
+
+def announce_notification(artist: str, title: str, kind: str, day: date, cover: str | None, link: str | None,
+                          now: datetime, app_url: str = settings.APP_URL) -> Notification:
+    """An announced release (pre-order on iTunes): "In arrivo: Ava Max – … esce il 04/12/2026"."""
+    novita = _novita_url(app_url)
+    actions = [("Apri l'app", novita)]
+    if link:
+        actions.append(("Apple Music", link))
+    return Notification(
+        title=f"In arrivo: {artist}",
+        message=f"{title} ({KIND_LABELS.get(kind, 'Uscita')})\nEsce il {day:%d/%m/%Y}",
+        click=novita,
+        icon=cover,
+        actions=tuple(actions),
+        priority=PRIORITY_QUIET if is_quiet(now) else PRIORITY_DEFAULT,
+        tags=("calendar",),
+    )
+
+
+def reminder_notification(artist: str, title: str, kind: str, cover: str | None, now: datetime,
+                          app_url: str = settings.APP_URL) -> Notification:
+    """The release day of an announced release: "Esce oggi: Ava Max – …", touching it opens Spotify."""
+    spotify = spotify_search_url(artist, title)
+    return Notification(
+        title=f"Esce oggi: {artist}",
+        message=f"{title} ({KIND_LABELS.get(kind, 'Uscita')})",
+        click=spotify,
+        icon=cover,
+        actions=(("Apri su Spotify", spotify), ("Apri l'app", _novita_url(app_url))),
+        priority=PRIORITY_QUIET if is_quiet(now) else PRIORITY_DEFAULT,
+    )
+
+
+def list_notification(title: str, lines: list[str], now: datetime, app_url: str = settings.APP_URL) -> Notification:
+    """Many items in one notification (e.g. "4 uscite in arrivo"); touching it opens Novità."""
+    shown = lines[:8] + ([f"…e altre {len(lines) - 8}"] if len(lines) > 8 else [])
+    novita = _novita_url(app_url)
+    return Notification(title=title, message="\n".join(shown), click=novita, actions=(("Apri le Novità", novita),),
+                        priority=PRIORITY_QUIET if is_quiet(now) else PRIORITY_DEFAULT)
 
 
 class NotificationSender(Protocol):

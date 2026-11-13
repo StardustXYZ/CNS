@@ -94,6 +94,13 @@ async def test_set_sends_typed_fields():
     assert json.loads(log[0].content) == {"fields": {"origine": {"stringValue": "prova"}, "giro": {"nullValue": None}}}
 
 
+async def test_delete():
+    log = []
+    async with client({f"{BASE}/utenti/u1/anteprime/9": {}}, log) as db:
+        await db.delete("utenti/u1/anteprime/9")
+    assert log[0].method == "DELETE"
+
+
 async def test_collection_group_lists_documents_of_every_user():
     name = "projects/demo-cns/databases/(default)/documents/utenti/{}/artisti/{}"
     answer = [

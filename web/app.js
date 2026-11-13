@@ -8,7 +8,7 @@ import { KINDS, arrange, countKinds, dateLabel, groupReleases, releaseFromApi, s
 import { DEFAULT_KINDS, LISTENED, SKIPPED, mark, markUpTo, progress, queueOf, undoLast, unmark } from "./segnalibro.js";
 import {
     addArtist, explainError, removeArtist, removeNovita, saveSettings, signIn, signOutUser, startFirebase,
-    updateArtist, watchArtists, watchDocument, watchNovita,
+    updateArtist, watchAnteprime, watchArtists, watchDocument, watchNovita,
 } from "./firebase.js";
 
 const BUILD = "__BUILD__"; // replaced by app/build_site.py with the build time
@@ -41,6 +41,7 @@ let artists = { state: "idle", list: [], error: "" };
 // The account's settings (utenti/{uid}: the ntfy topic) and its Novità (written by GitHub)
 let userSettings = { state: "idle", data: {}, error: "" };
 let novita = { state: "idle", list: [], error: "" };
+let anteprime = { state: "idle", list: [], error: "" }; // announced releases ("In arrivo"), written by GitHub
 const ntfyTest = { state: "", message: "" }; // "Manda una prova": "" | "sending" | "ok" | "error"
 let ntfyDraft = null; // what is being typed in the topic box (kept when the page is redrawn)
 const NOVITA_SEEN_KEY = "cns.novita.vista"; // when Novità was last opened on this phone (for the menu count)
@@ -197,8 +198,52 @@ function pageNovita() {
         if (!TOPIC_PATTERN.test(userSettings.data.ntfy || "") && userSettings.state === "ok") {
             body = `<p class="notice">Per ricevere le notifiche sul telefono scrivi il tuo argomento ntfy in <a href="#/impostazioni">Impostazioni</a>.</p>` + body;
         }
+        const coming = comingSoon();
+        if (coming.length) {
+            body = `<h2>In arrivo</h2><div class="release-list">${coming.map((n) => announcementRow(n)).join("")}</div><h2>Uscite</h2>` + body;
+        }
     }
     return header("Novità", "Le uscite nuove degli artisti in Controllare, dalla più recente.") + body;
+}
+
+// ------------------------------------------------------------------ In arrivo (announced releases)
+
+const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+
+/** The announced releases from today on (of one artist, or all), soonest first. */
+function comingSoon(artistId = null) {
+    const today = todayIso();
+    return anteprime.list
+        .filter((a) => (a.data || "") >= today && (!artistId || a.artista_id === String(artistId)))
+        .sort((a, b) => (a.data || "").localeCompare(b.data || "") || (a.titolo || "").localeCompare(b.titolo || ""));
+}
+
+function daysLeftLabel(iso) {
+    if (iso === todayIso()) return "esce oggi";
+    const days = Math.round((new Date(`${iso}T12:00:00`) - new Date(`${todayIso()}T12:00:00`)) / 864e5);
+    return days === 1 ? "esce domani" : `esce il ${dateLabel(iso)} (tra ${days} giorni)`;
+}
+
+function announcementRow(n, showArtist = true) {
+    const cover = n.copertina
+        ? `<img class="cover" src="${esc(n.copertina)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+        : `<span class="cover placeholder" aria-hidden="true">📅</span>`;
+    const isToday = n.data === todayIso();
+    const artist = showArtist ? `<a href="#/artista/${esc(n.artista_id)}">${esc(n.artista)}</a> · ` : "";
+    return `<div class="release coming${isToday ? " today" : ""}">${cover}
+        <div class="release-info"><strong>${esc(n.titolo)}</strong>
+            <span class="small">${artist}${esc(KINDS[n.tipo]?.label || "Uscita")}</span>
+            <span class="when">${esc(daysLeftLabel(n.data))}</span></div>
+        <div class="release-actions">
+            ${isToday ? `<a class="btn btn-small btn-primary" href="${esc(n.spotify || spotifySearchUrl(n.artista, n.titolo))}" target="_blank" rel="noopener">Spotify</a>` : ""}
+            ${n.link ? `<a class="btn btn-small" href="${esc(n.link)}" target="_blank" rel="noopener">Apple Music</a>` : ""}
+        </div></div>`;
+}
+
+function comingSection(a) {
+    const coming = comingSoon(a.id);
+    if (!coming.length) return "";
+    return `<h2>In arrivo</h2><div class="release-list">${coming.map((n) => announcementRow(n, false)).join("")}</div>`;
 }
 
 function novitaRow(n) {
@@ -304,6 +349,7 @@ function pageArtist(id) {
         </div>
         ${errorNotice()}${infoNotice()}
         ${a.lista === "recuperando" ? bookmarkSection(a) : ""}
+        ${comingSection(a)}
         ${a.lista === "controllare" ? alertsSection(a) : ""}
         <h2>Lista</h2>
         <div class="segmented" role="group" aria-label="Lista">${choices}</div>
@@ -745,10 +791,14 @@ function followAccount() {
     artists = { state: uid ? "loading" : "idle", list: [], error: "" };
     userSettings = { state: uid ? "loading" : "idle", data: {}, error: "" };
     novita = { state: uid ? "loading" : "idle", list: [], error: "" };
+    anteprime = { state: uid ? "loading" : "idle", list: [], error: "" };
     if (!uid) return;
     stopWatching.push(watchDocument(`utenti/${uid}`,
         (data) => { userSettings = { state: "ok", data: data || {}, error: "" }; render(); },
         (err) => { userSettings = { state: "error", data: {}, error: explainError(err) }; render(); }));
+    stopWatching.push(watchAnteprime(uid,
+        (list) => { anteprime = { state: "ok", list, error: "" }; render(); },
+        (err) => { anteprime = { state: "error", list: [], error: explainError(err) }; render(); }));
     stopWatching.push(watchNovita(uid,
         (list) => { novita = { state: "ok", list, error: "" }; if (currentView().key === "novita") markNovitaSeen(); render(); },
         (err) => { novita = { state: "error", list: [], error: explainError(err) }; render(); }));

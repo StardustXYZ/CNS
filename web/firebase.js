@@ -78,6 +78,13 @@ export function watchNovita(uid, onData, onError) {
     return storeMod.onSnapshot(q, (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), onError);
 }
 
+/** Follow the account's announced releases ("In arrivo", written by GitHub). */
+export function watchAnteprime(uid, onData, onError) {
+    const { db, storeMod } = sdk;
+    return storeMod.onSnapshot(storeMod.collection(db, `utenti/${uid}/anteprime`),
+        (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), onError);
+}
+
 export async function removeNovita(uid, ids) {
     const { db, storeMod } = sdk;
     await Promise.all(ids.map((id) => storeMod.deleteDoc(storeMod.doc(db, `utenti/${uid}/novita/${id}`))));
