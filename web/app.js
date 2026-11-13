@@ -6,8 +6,9 @@
 import { artistIdFromLink, fansLabel, getArtist, getDiscography, searchArtists } from "./deezer.js";
 import { KINDS, arrange, countKinds, dateLabel, groupReleases, releaseFromApi, spotifySearchUrl } from "./discografia.js";
 import { DEFAULT_KINDS, LISTENED, SKIPPED, mark, markUpTo, progress, queueOf, undoLast, unmark } from "./segnalibro.js";
+import { backupFileName, buildBackup, parseBackup } from "./copia.js";
 import {
-    addArtist, explainError, removeArtist, removeNovita, saveAllowList, saveSettings, signIn, signOutUser, startFirebase,
+    addArtist, explainError, removeArtist, removeNovita, restoreArtists, saveAllowList, saveSettings, signIn, signOutUser, startFirebase,
     updateArtist, watchAnteprime, watchArtists, watchDocument, watchNovita,
 } from "./firebase.js";
 
@@ -49,6 +50,7 @@ let allowList = { state: "idle", data: {}, error: "" };
 let allowDraft = ""; // the e-mail being typed in the "Persone ammesse" box
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_ALLOWED = 50;
+const backupStatus = { ok: true, message: "" }; // result of the last download or restore
 const NOVITA_SEEN_KEY = "cns.novita.vista"; // when Novità was last opened on this phone (for the menu count)
 const TOPIC_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 let stopWatching = [];
@@ -776,6 +778,56 @@ async function allowListAction(button) {
     render();
 }
 
+// ------------------------------------------------------------------ backup (Impostazioni)
+
+function backupCard() {
+    if (!account.user || notAllowed()) return "";
+    const status = backupStatus.message
+        ? `<p class="${backupStatus.ok ? "badge" : "error"}">${esc(backupStatus.message)}</p>` : "";
+    return `<h2>Copia di sicurezza</h2>
+        <div class="card">
+            <p class="small">Un file con le tue liste, le note, i segnalibri, gli avvisi e lo storico delle Novità. Tienilo sul telefono o sul PC: con «Ripristina» torna tutto com'era (gli artisti con lo stesso codice vengono sostituiti, gli altri restano).</p>
+            <p class="card-action button-row">
+                <button class="btn btn-primary" data-action="backup-download"${artists.state === "ok" ? "" : " disabled"}>Scarica la copia</button>
+                <label class="btn" for="backup-file">Ripristina da una copia</label>
+                <input type="file" id="backup-file" accept="application/json,.json" hidden>
+            </p>${status}
+        </div>`;
+}
+
+function downloadBackup() {
+    const backup = buildBackup({
+        artists: artists.list, settings: userSettings.data, novita: novita.list, anteprime: anteprime.list,
+        email: account.user?.email || "",
+    });
+    const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 1)], { type: "application/json" }));
+    const link = Object.assign(document.createElement("a"), { href: url, download: backupFileName() });
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    Object.assign(backupStatus, { ok: true, message: `Copia scaricata: ${artists.list.length} artisti ✓` });
+    render();
+}
+
+async function restoreBackup(input) {
+    const uid = account.user?.uid;
+    const file = input.files?.[0];
+    input.value = ""; // the same file can be chosen again
+    if (!uid || !file) return;
+    try {
+        const backup = parseBackup(await file.text());
+        const skipped = backup.skipped ? ` (${backup.skipped} non validi verranno saltati)` : "";
+        if (!confirm(`Ripristinare ${backup.artists.length} artisti dalla copia${skipped}? Quelli con lo stesso codice verranno sostituiti.`)) return;
+        await restoreArtists(uid, backup.artists);
+        if (backup.ntfy) await saveSettings(uid, { ntfy: backup.ntfy });
+        Object.assign(backupStatus, { ok: true, message: `Ripristinati ${backup.artists.length} artisti ✓` });
+    } catch (err) {
+        Object.assign(backupStatus, { ok: false, message: `Copia non ripristinata: ${err.code ? explainError(err) : err.message}.` });
+    }
+    render();
+}
+
 function pageImpostazioni() {
     const install = installPrompt
         ? `<p class="card-action"><button class="btn btn-primary" data-action="install">Aggiungi alla schermata Home</button></p>`
@@ -792,6 +844,7 @@ function pageImpostazioni() {
             <li><span>Tipi di uscita</span><span class="value">tutti; si cambiano nella pagina dell'artista</span></li>
             <li><span>Artista appena aggiunto</span><span class="value">la prima volta nessun avviso</span></li>
         </ul></div>
+        ${backupCard()}
         <h2>App</h2>
         <div class="card"><ul class="settings-list">
             <li><span>Versione</span><span class="value">${esc(buildLabel())}</span></li>
@@ -1013,6 +1066,7 @@ document.addEventListener("click", (e) => {
     if (action === "alert-kind") alertAction(button);
     if (action === "ntfy-save" || action === "ntfy-test") ntfyAction(action);
     if (action === "allow-add" || action === "allow-remove") allowListAction(button);
+    if (action === "backup-download") downloadBackup();
     if (action === "novita-clear") clearNovita();
     if (action === "install" && installPrompt) {
         installPrompt.prompt();
@@ -1031,6 +1085,7 @@ document.addEventListener("input", (e) => {
 document.addEventListener("change", (e) => {
     if (e.target.id === "nota") saveNote(e.target);
     if (e.target.dataset.action === "bm-auto") bookmarkAction(e.target);
+    if (e.target.id === "backup-file") restoreBackup(e.target);
 });
 
 document.addEventListener("focusout", (e) => {

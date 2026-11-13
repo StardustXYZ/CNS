@@ -215,9 +215,11 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
 - [x] Pubblicata il 13/11/2026, regole incollate; primo controllo vero su GitHub riuscito (avviato a mano alle 19:23).
 
 ### Fase 7 – Rifiniture
-- [ ] Copia di sicurezza ed esportazione delle liste in JSON.
+Scelti il 13/11/2026: punti 1, 2 e la pulizia; Telegram per ora no.
+- [x] Copia di sicurezza ed esportazione in JSON (Impostazioni → "Copia di sicurezza", `web/copia.js`): artisti con note, segnalibri e avvisi, argomento ntfy, storico delle Novità e uscite in arrivo. "Ripristina" riporta artisti e argomento (gli artisti con lo stesso codice vengono sostituiti, gli altri restano); Novità e In arrivo restano nel file come promemoria, perché le scrive solo GitHub. Provata sull'emulatore: artista tolto e ripristinato con il segnalibro, file sbagliato rifiutato.
 - [ ] Layout per il PC.
-- [ ] Telegram come seconda notifica (facoltativo).
+- [ ] Telegram come seconda notifica (facoltativo, per ora no).
+- [ ] Pulizia delle cartelle di lavoro e dei branch già uniti.
 
 ### Fase 8 – Lettore MP3 (progetto a parte, più avanti)
 - [ ] Importazione dei file scelti dal telefono, salvati nello spazio dell'app.

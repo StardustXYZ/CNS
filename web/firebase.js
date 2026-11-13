@@ -60,6 +60,20 @@ export function watchDocument(path, onData, onError) {
     return storeMod.onSnapshot(storeMod.doc(db, path), (snap) => onData(snap.exists() ? snap.data() : null), onError);
 }
 
+// ------------------------------------------------------------------ backup
+
+/** Write back the artists of a backup, all together (each one replaces the saved artist with the same code). */
+export async function restoreArtists(uid, artists) {
+    const { db, storeMod } = sdk;
+    for (let i = 0; i < artists.length; i += 400) { // Firestore takes up to 500 writes at once
+        const batch = storeMod.writeBatch(db);
+        for (const { id, ...fields } of artists.slice(i, i + 400)) {
+            batch.set(storeMod.doc(db, `utenti/${uid}/artisti/${id}`), fields);
+        }
+        await batch.commit();
+    }
+}
+
 // ------------------------------------------------------------------ allow list (administrator only)
 
 /** Replace the e-mails admitted to CNS (config/ammessi.email); the rules let only the administrator do it. */
