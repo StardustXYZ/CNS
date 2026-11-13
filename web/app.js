@@ -357,7 +357,9 @@ function pageArtist(id) {
     const choices = Object.entries(LISTS).map(([key, { label }]) =>
         `<button class="btn segment${a.lista === key ? " active" : ""}" data-action="move" data-id="${esc(a.id)}" data-lista="${key}"
             ${a.lista === key ? 'aria-pressed="true"' : 'aria-pressed="false"'}>${label}</button>`).join("");
-    return `<div class="artist-hero">${photo(a.foto, "artist-photo big")}
+    // On the phone one column; on the PC the artist on the left and the discography on the right
+    return `<div class="artist-layout"><div class="artist-side">
+        <div class="artist-hero">${photo(a.foto, "artist-photo big")}
             <div><h1>${esc(a.nome)}</h1>${a.fan ? `<p class="subtitle">${esc(fansLabel(a.fan))}</p>` : ""}
             ${a.link ? `<p class="card-action"><a class="btn" href="${esc(a.link)}" target="_blank" rel="noopener">Apri su Deezer</a></p>` : ""}</div>
         </div>
@@ -370,7 +372,9 @@ function pageArtist(id) {
         <h2>Nota</h2>
         <textarea id="nota" data-id="${esc(a.id)}" maxlength="500" rows="3" placeholder="Ad esempio: aspetto il nuovo album">${esc(a.nota || "")}</textarea>
         <p class="small">La nota si salva da sola quando esci dalla casella.</p>
+        </div><div class="artist-main">
         ${discographySection(a)}
+        </div></div>
         <p class="page-actions"><button class="btn btn-danger" data-action="remove" data-id="${esc(a.id)}">Togli dalle liste</button></p>`;
 }
 
@@ -832,8 +836,11 @@ function pageImpostazioni() {
     const install = installPrompt
         ? `<p class="card-action"><button class="btn btn-primary" data-action="install">Aggiungi alla schermata Home</button></p>`
         : "";
+    // On the PC two columns: the account on the left, notifications, backup and app on the right
     return header("Impostazioni", "Il tuo account, le notifiche e l'app.")
-        + `<h2>Account</h2>${accountCard()}${githubCard()}${allowListCard()}
+        + `<div class="settings-grid"><section>
+        <h2>Account</h2>${accountCard()}${githubCard()}${allowListCard()}
+        </section><section>
         <h2>Notifiche</h2>
         ${ntfyCard()}
         <div class="card"><ul class="settings-list">
@@ -849,7 +856,8 @@ function pageImpostazioni() {
         <div class="card"><ul class="settings-list">
             <li><span>Versione</span><span class="value">${esc(buildLabel())}</span></li>
             <li><span>Dati delle uscite</span><span class="value">Deezer</span></li>
-        </ul>${install}</div>`;
+        </ul>${install}</div>
+        </section></div>`;
 }
 
 function accountCard() {
@@ -1152,6 +1160,18 @@ document.addEventListener("touchend", (e) => {
     location.hash = target;
 });
 document.addEventListener("touchcancel", endSwipe);
+
+// On the PC the arrow keys do what the swipe does on the phone (not while typing in a box)
+document.addEventListener("keydown", (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.target.closest("input, textarea, select, [contenteditable]")) return;
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    const target = step && swipeTarget(step);
+    if (!target) return;
+    e.preventDefault();
+    swipeDirection = step > 0 ? "next" : "prev";
+    location.hash = target;
+});
 // The slide-in class goes away once played, so a later redraw never starts from an old animation
 document.getElementById("app").addEventListener("animationend", (e) => e.currentTarget.classList.remove("swipe-next", "swipe-prev"));
 

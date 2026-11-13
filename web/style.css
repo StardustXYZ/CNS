@@ -308,3 +308,34 @@ textarea { resize: vertical; }
 .allow-list { list-style: none; margin: 0.5rem 0; display: flex; flex-direction: column; gap: 0.3rem; }
 .allow-list li { display: flex; justify-content: space-between; gap: 0.75rem; align-items: center; overflow-wrap: anywhere; }
 label.btn { cursor: pointer; }
+
+/* ---- PC: wider screens use the space ---- */
+@media (min-width: 900px) {
+    .navbar { padding: 0.75rem 2rem 0.5rem; }
+    .container { padding: 0 2rem; margin-top: 2rem; }
+    h1 { font-size: 1.8rem; }
+    /* Lists of artists and releases side by side */
+    .artist-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+    .release-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+    .release { height: 100%; }
+    .empty-state { padding: 4rem 1rem; }
+    /* Impostazioni in two columns */
+    .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 2rem; align-items: start; }
+    .settings-grid > section > h2:first-child { margin-top: 0.5rem; }
+    /* Artist page: the artist on the left, the discography on the right */
+    .artist-layout { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 2.5rem; align-items: start; }
+    .artist-main > h2:first-child { margin-top: 0.5rem; }
+    .artist-main .release-list { grid-template-columns: minmax(0, 1fr); }
+    .artist-hero { flex-direction: column; align-items: flex-start; }
+    .artist-photo.big { width: 160px; height: 160px; }
+}
+@media (min-width: 1280px) {
+    .container { max-width: 1240px; }
+    .artist-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .artist-main .release-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Hover only where there is a mouse */
+@media (hover: hover) {
+    .release:hover, a.artist-card:hover { background: var(--surface-2); }
+    .chip:hover { border-color: var(--accent); }
+}

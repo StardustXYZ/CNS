@@ -217,7 +217,7 @@ Ordine deciso il 12/11/2026: prima la **3a** (vedere e aggiungere gli artisti), 
 ### Fase 7 – Rifiniture
 Scelti il 13/11/2026: punti 1, 2 e la pulizia; Telegram per ora no.
 - [x] Copia di sicurezza ed esportazione in JSON (Impostazioni → "Copia di sicurezza", `web/copia.js`): artisti con note, segnalibri e avvisi, argomento ntfy, storico delle Novità e uscite in arrivo. "Ripristina" riporta artisti e argomento (gli artisti con lo stesso codice vengono sostituiti, gli altri restano); Novità e In arrivo restano nel file come promemoria, perché le scrive solo GitHub. Provata sull'emulatore: artista tolto e ripristinato con il segnalibro, file sbagliato rifiutato.
-- [ ] Layout per il PC.
+- [x] Layout per il PC (da 900 px in su): liste di artisti a griglia (2 colonne, 3 da 1280 px), Novità e discografia su più colonne, pagina dell'artista con l'artista a sinistra e la discografia a destra, Impostazioni su due colonne; frecce ← → della tastiera per cambiare pagina (non mentre si scrive). Sul telefono non cambia niente. Provato a 1280 e a 375 px.
 - [ ] Telegram come seconda notifica (facoltativo, per ora no).
 - [ ] Pulizia delle cartelle di lavoro e dei branch già uniti.
 
