@@ -8,9 +8,13 @@ import 'data/deezer.dart';
 import 'data/discography_store.dart';
 import 'data/firebase_account.dart';
 import 'data/firebase_artists.dart';
+import 'data/firebase_news.dart';
+import 'data/home_widget_sync.dart';
+import 'data/news.dart';
 import 'home.dart';
 import 'pages/account_pages.dart';
 import 'pages/list_pages.dart';
+import 'pages/novita_page.dart';
 import 'pages/widgets.dart';
 import 'theme.dart';
 
@@ -18,23 +22,30 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   AccountBackend? accountBackend;
   ArtistsBackend? artistsBackend;
+  NewsBackend? newsBackend;
   try {
     await Firebase.initializeApp(); // from android/app/google-services.json
     accountBackend = FirebaseAccountBackend();
     artistsBackend = FirebaseArtistsBackend();
+    newsBackend = FirebaseNewsBackend();
   } catch (err) {
     debugPrint('Firebase non avviato: $err'); // the access screen says that the account is not available
   }
   final account = AccountStore(accountBackend);
   final deezer = DeezerClient();
-  runApp(
-    CnsApp(
-      account: account,
-      artists: ArtistStore(account, artistsBackend),
-      deezer: deezer,
-      discographies: DiscographyStore(deezer, FileDiscoCache()),
-    ),
-  );
+  final artists = ArtistStore(account, artistsBackend);
+  final news = NewsStore(account, newsBackend, FileSeenStore());
+  final discographies = DiscographyStore(deezer, FileDiscoCache());
+  runApp(CnsApp(account: account, artists: artists, deezer: deezer, discographies: discographies, news: news));
+  // The home screen widgets: their texts follow the app, a tap opens the right page
+  try {
+    final bridge = HomeWidgetBridge();
+    WidgetSync(bridge, news, artists, discographies);
+    widgetLink.value = await bridge.initialLink();
+    bridge.links.listen((uri) => widgetLink.value = uri);
+  } catch (err) {
+    debugPrint('Widget non disponibili: $err');
+  }
 }
 
 /// CNS (Chi Ni Sentimu): the releases of the artists you follow, on the phone.
@@ -45,6 +56,7 @@ class CnsApp extends StatelessWidget {
     required this.artists,
     required this.deezer,
     required this.discographies,
+    required this.news,
   });
 
   // With fakes in the tests
@@ -52,6 +64,7 @@ class CnsApp extends StatelessWidget {
   final ArtistStore artists;
   final DeezerApi deezer;
   final DiscographyStore discographies;
+  final NewsStore news;
 
   @override
   Widget build(BuildContext context) {
@@ -64,15 +77,18 @@ class CnsApp extends StatelessWidget {
           api: deezer,
           child: DiscographyScope(
             store: discographies,
-            child: MaterialApp(
-              title: 'CNS',
-              debugShowCheckedModeBanner: false,
-              theme: cnsTheme(),
-              // Flutter's own texts (dates, "Annulla", "Incolla"…) in Italian
-              locale: const Locale('it'),
-              supportedLocales: const [Locale('it')],
-              localizationsDelegates: GlobalMaterialLocalizations.delegates,
-              home: const AccessGate(child: HomeShell()),
+            child: NewsScope(
+              store: news,
+              child: MaterialApp(
+                title: 'CNS',
+                debugShowCheckedModeBanner: false,
+                theme: cnsTheme(),
+                // Flutter's own texts (dates, "Annulla", "Incolla"…) in Italian
+                locale: const Locale('it'),
+                supportedLocales: const [Locale('it')],
+                localizationsDelegates: GlobalMaterialLocalizations.delegates,
+                home: const AccessGate(child: HomeShell()),
+              ),
             ),
           ),
         ),

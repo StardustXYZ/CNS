@@ -5,6 +5,7 @@ import 'package:cns/data/artists.dart';
 import 'package:cns/data/deezer.dart';
 import 'package:cns/data/discografia.dart';
 import 'package:cns/data/discography_store.dart';
+import 'package:cns/data/news.dart';
 import 'package:cns/main.dart';
 
 import 'fake_account.dart';
@@ -118,22 +119,53 @@ class FakeDeezer implements DeezerApi {
   }
 }
 
+/// Novità and In arrivo in memory, with live updates.
+class FakeNewsBackend implements NewsBackend {
+  final novita = <String, List<NewsItem>>{};
+  final anteprime = <String, List<NewsItem>>{};
+  final _changes = StreamController<String>.broadcast();
+
+  void publish(String uid) => _changes.add(uid);
+
+  @override
+  Stream<List<NewsItem>> watchNovita(String uid) async* {
+    yield [...?novita[uid]];
+    yield* _changes.stream.where((u) => u == uid).map((_) => [...?novita[uid]]);
+  }
+
+  @override
+  Stream<List<NewsItem>> watchAnteprime(String uid) async* {
+    yield [...?anteprime[uid]];
+    yield* _changes.stream.where((u) => u == uid).map((_) => [...?anteprime[uid]]);
+  }
+
+  @override
+  Future<void> removeNovita(String uid, List<String> ids) async {
+    novita[uid]?.removeWhere((n) => ids.contains(n.id));
+    _changes.add(uid);
+  }
+}
+
 /// The whole app with fakes: account, artists, Deezer and the copy of the discographies.
 class TestApp {
   TestApp() {
     account = AccountStore(accountBackend);
     artists = ArtistStore(account, artistsBackend);
     discos = DiscographyStore(deezer, cache, now: () => clock);
+    news = NewsStore(account, newsBackend, seen, now: () => clock);
   }
 
   final accountBackend = FakeBackend();
   final artistsBackend = FakeArtistsBackend();
   final deezer = FakeDeezer();
   final cache = MemoryDiscoCache();
+  final newsBackend = FakeNewsBackend();
+  final seen = MemorySeenStore();
   DateTime clock = DateTime(2026, 11, 15, 16);
   late final AccountStore account;
   late final ArtistStore artists;
   late final DiscographyStore discos;
+  late final NewsStore news;
 
-  CnsApp get widget => CnsApp(account: account, artists: artists, deezer: deezer, discographies: discos);
+  CnsApp get widget => CnsApp(account: account, artists: artists, deezer: deezer, discographies: discos, news: news);
 }

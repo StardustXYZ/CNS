@@ -256,8 +256,8 @@ Come CNV: un'app Android vera accanto all'app web, che legge e scrive **gli stes
     - Anche l'app web deve leggere questo campo, per non perdere le spunte.
   - [x] *Nuovo* – **"Ti potrebbero piacere"**: nella pagina dell'artista, una riga con gli artisti simili dati da Deezer, ognuno con il pulsante + per aggiungerlo. Chi è già in una lista non compare.
   - [x] *Nuovo* – **"Cosa ascolto adesso?"**: un pulsante in Recuperando che sceglie a caso un'uscita non ancora fatta tra tutti gli artisti in Recuperando. Mostra copertina, artista e titolo, con i pulsanti "Ascoltato", "Un'altra" e "Apri su Spotify". Si possono escludere i singoli, se vuoi solo album.
-- [ ] **8.5 Novità e In arrivo**, con Spotify, Deezer e Apple Music, e il contatore delle nuove.
-  - [ ] *Nuovo* – **Widget Android** per la schermata principale, in due versioni:
+- [x] **8.5 Novità e In arrivo** — fatta il 15/11/2026 (provata sul telefono, widget compresi), con Spotify, Deezer e Apple Music, e il contatore delle nuove.
+  - [x] *Nuovo* – **Widget Android** per la schermata principale, in due versioni:
     - "Ultime uscite", con le ultime 3 Novità;
     - "Prossimo da recuperare", con l'uscita successiva di un artista in Recuperando.
 

@@ -36,7 +36,7 @@ void main() {
     await tester.tap(menuItem('Novità'));
     await tester.pumpAndSettle();
     expect(selectedPage(tester), 'Novità');
-    expect(find.text('Le uscite nuove degli artisti che controlli, e quelle in arrivo.'), findsOneWidget);
+    expect(find.text('Le uscite nuove degli artisti in Controllare, dalla più recente.'), findsOneWidget);
     await tester.tap(menuItem('Impostazioni'));
     await tester.pumpAndSettle();
     expect(find.text('Account'), findsOneWidget); // the real page, no longer the placeholder

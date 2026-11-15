@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home screen widgets (shown in the widget picker of Android) -->
+    <string name="widget_ultime_uscite_titolo">🎧 Ultime uscite</string>
+    <string name="widget_ultime_uscite_descrizione">Le ultime Novità degli artisti che controlli</string>
+    <string name="widget_prossimo_titolo">🎧 Prossimo da recuperare</string>
+    <string name="widget_prossimo_descrizione">La prossima uscita da ascoltare in Recuperando</string>
+    <string name="widget_caricamento">Apri CNS per aggiornare.</string>
+</resources>

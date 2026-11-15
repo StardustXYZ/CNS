@@ -8,6 +8,7 @@ import '../data/segnalibro.dart';
 import '../theme.dart';
 import 'account_pages.dart' show attempt, say;
 import 'list_pages.dart';
+import 'novita_page.dart';
 import 'related_artists.dart';
 import 'tracks_page.dart';
 import 'widgets.dart';
@@ -143,6 +144,7 @@ class _ArtistPageState extends State<ArtistPage> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
             _hero(a),
+            ..._coming(a),
             if (a.lista == Lists.recuperando) ..._bookmark(a, entry, groups, queue),
             if (a.lista == Lists.controllare) ..._alerts(a),
             const SectionTitle('Lista'),
@@ -211,6 +213,17 @@ class _ArtistPageState extends State<ArtistPage> {
         ),
       ],
     );
+  }
+
+  /// "In arrivo": this artist's announced releases (iTunes pre-orders found by GitHub).
+  List<Widget> _coming(SavedArtist a) {
+    final news = NewsScope.of(context);
+    final coming = news.comingSoon(artistId: a.id);
+    if (coming.isEmpty) return const [];
+    return [
+      const SectionTitle('In arrivo'),
+      for (final n in coming) AnnouncementTile(item: n, today: news.today, showArtist: false),
+    ];
   }
 
   // ---------------------------------------------------------------- bookmark (Recuperando)

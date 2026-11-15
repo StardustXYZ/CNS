@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'data/artists.dart';
+import 'pages/artist_page.dart';
 import 'pages/impostazioni_page.dart';
 import 'pages/list_pages.dart';
-import 'pages/page_placeholder.dart';
+import 'pages/novita_page.dart';
 import 'theme.dart';
 
 /// One page of the app, as listed in the bottom menu.
@@ -44,23 +45,61 @@ const cnsPages = [
   ),
 ];
 
+/// The position of Novità in the menu.
+const novitaIndex = 2;
+
+/// A tap on a home screen widget (cns://novita, cns://recuperando, cns://artista/{id}): kept
+/// here until the app's pages are there (after the sign-in), then opened.
+final widgetLink = ValueNotifier<Uri?>(null);
+
 /// The app's frame: title bar, the pages side by side (swipe to move) and the bottom menu.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
   @override
-  State<HomeShell> createState() => _HomeShellState();
+  State<HomeShell> createState() => HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class HomeShellState extends State<HomeShell> {
   final _pager = PageController();
   int _current = 0;
 
   @override
+  void initState() {
+    super.initState();
+    widgetLink.addListener(_openLink);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openLink());
+  }
+
+  @override
   void dispose() {
+    widgetLink.removeListener(_openLink);
     _pager.dispose();
     super.dispose();
   }
+
+  /// Opens what the tapped widget points to.
+  void _openLink() {
+    final uri = widgetLink.value;
+    if (uri == null || !mounted) return;
+    widgetLink.value = null;
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    switch (uri.host) {
+      case 'novita':
+        _goTo(novitaIndex);
+      case 'recuperando':
+        _goTo(1);
+      case 'artista' when uri.pathSegments.isNotEmpty:
+        _goTo(1);
+        if (ArtistsScope.of(context).byId(uri.pathSegments.first) != null) {
+          navigator.push(MaterialPageRoute(builder: (_) => ArtistPage(artistId: uri.pathSegments.first)));
+        }
+    }
+  }
+
+  /// Opens one page of the menu (also from the home screen widget).
+  void goTo(int index) => _goTo(index);
 
   void _goTo(int index) {
     setState(() => _current = index);
@@ -71,7 +110,12 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final artists = ArtistsScope.of(context);
     // How many artists in each list, on the menu (as the counters of the web menu)
-    final counts = [artists.count(Lists.controllare), artists.count(Lists.recuperando), 0, 0];
+    final news = NewsScope.of(context);
+    final counts = [artists.count(Lists.controllare), artists.count(Lists.recuperando), news.unseen, 0];
+    // With Novità open, the new ones count as seen (also the ones arriving meanwhile)
+    if (_current == novitaIndex && news.unseen > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => news.markSeen());
+    }
     return Scaffold(
       appBar: AppBar(title: const CnsTitle()),
       body: PageView(
@@ -80,7 +124,7 @@ class _HomeShellState extends State<HomeShell> {
         children: [
           const ArtistListPage(lista: Lists.controllare),
           const ArtistListPage(lista: Lists.recuperando),
-          PagePlaceholder(page: cnsPages[2]),
+          const NovitaPage(),
           const ImpostazioniPage(),
         ],
       ),
@@ -91,8 +135,11 @@ class _HomeShellState extends State<HomeShell> {
           for (final (i, page) in cnsPages.indexed)
             NavigationDestination(
               icon: Badge(isLabelVisible: counts[i] > 0, label: Text('${counts[i]}'), child: Icon(page.icon)),
-              selectedIcon:
-                  Badge(isLabelVisible: counts[i] > 0, label: Text('${counts[i]}'), child: Icon(page.selectedIcon)),
+              selectedIcon: Badge(
+                isLabelVisible: counts[i] > 0,
+                label: Text('${counts[i]}'),
+                child: Icon(page.selectedIcon),
+              ),
               label: page.label,
             ),
         ],
@@ -112,7 +159,10 @@ class CnsTitle extends StatelessWidget {
       children: [
         Icon(Icons.headphones, color: CnsColors.green, size: 26),
         SizedBox(width: 8),
-        Text('CNS', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: CnsColors.text)),
+        Text(
+          'CNS',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: CnsColors.text),
+        ),
         SizedBox(width: 8),
         // On a narrow phone it shortens instead of overflowing
         Flexible(
