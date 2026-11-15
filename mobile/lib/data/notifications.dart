@@ -85,6 +85,7 @@ class NotificationStore extends ChangeNotifier {
       }
     } catch (err) {
       debugPrint('Notifiche non lette: $err');
+      if (_uid == uid) problem = 'Non riesco a ricollegare questo telefono alle notifiche (${describeError(err)}).';
     } finally {
       loading = false;
       _changed();
@@ -92,10 +93,35 @@ class NotificationStore extends ChangeNotifier {
   }
 
   Future<void> _register(String uid) async {
-    final token = await _push.token();
+    final String? token;
+    try {
+      token = await _token();
+    } catch (err) {
+      throw AccountError('Il telefono non dà il codice per le notifiche (${describeError(err)}). '
+          'Controlla la connessione e riprova tra poco.');
+    }
     if (token == null || token.isEmpty) throw const AccountError('Il telefono non ha dato il codice per le notifiche.');
-    await _phones.savePhone(uid, await _phoneId(), token);
+    try {
+      await _phones.savePhone(uid, await _phoneId(), token);
+    } catch (err) {
+      throw AccountError('Firebase non ha salvato questo telefono (${describeError(err)}).');
+    }
   }
+
+  /// The messaging token; asked a second time after a pause when the first try fails
+  /// (Google's services may need a moment, e.g. right after the app opens).
+  Future<String?> _token() async {
+    try {
+      return await _push.token();
+    } catch (_) {
+      await Future<void>.delayed(retryPause);
+      return _push.token();
+    }
+  }
+
+  /// The pause before asking the token again (none in the tests).
+  @visibleForTesting
+  static Duration retryPause = const Duration(seconds: 2);
 
   /// The switch: turning it on asks Android for the permission.
   Future<void> setOn(bool value) async {
@@ -120,7 +146,7 @@ class NotificationStore extends ChangeNotifier {
       problem = err.message;
     } catch (err) {
       debugPrint('Notifiche non cambiate: $err');
-      problem = 'Non riesco a salvare la scelta. Controlla la connessione e riprova.';
+      problem = 'Non riesco a salvare la scelta (${describeError(err)}). Controlla la connessione e riprova.';
     } finally {
       busy = false;
       _changed();
@@ -173,4 +199,13 @@ Future<String> savedPhoneId() async {
   final id = List.generate(22, (_) => chars[random.nextInt(chars.length)]).join();
   await file.writeAsString(id, flush: true);
   return id;
+}
+
+/// A short description of an error for the person (and for whoever helps them): the code of
+/// Firebase's errors when there is one ("permission-denied"), otherwise the first words.
+String describeError(Object err) {
+  final text = '$err'.replaceAll(RegExp(r'\s+'), ' ').trim();
+  final code = RegExp(r'\[[a-z_]+/([a-z-]+)\]').firstMatch(text)?.group(1);
+  if (code != null) return code;
+  return text.length > 120 ? '${text.substring(0, 120)}…' : text;
 }

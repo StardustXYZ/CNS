@@ -70,3 +70,20 @@ String dateTimeLabel(DateTime d) {
   final l = d.toLocal();
   return '${two(l.day)}/${two(l.month)}/${l.year} alle ${two(l.hour)}:${two(l.minute)}';
 }
+
+/// How far the bookmark is: the done part in green on the white of the whole discography.
+class BookmarkBar extends StatelessWidget {
+  const BookmarkBar({super.key, required this.value, this.height = 6});
+
+  final double value; // 0..1
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => LinearProgressIndicator(
+        value: value,
+        minHeight: height,
+        color: CnsColors.green,
+        backgroundColor: Colors.white,
+        borderRadius: BorderRadius.circular(height / 2),
+      );
+}

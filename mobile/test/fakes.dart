@@ -192,8 +192,16 @@ class FakePush implements PushBackend {
   @override
   Future<bool> hasPermission() async => granted;
 
+  int tokenFailures = 0; // how many times getToken fails before answering
+
   @override
-  Future<String?> token() async => currentToken;
+  Future<String?> token() async {
+    if (tokenFailures > 0) {
+      tokenFailures--;
+      throw Exception('java.io.IOException: SERVICE_NOT_AVAILABLE');
+    }
+    return currentToken;
+  }
 
   @override
   Stream<String> tokenRefresh() => refresh.stream;
@@ -211,12 +219,16 @@ class FakePush implements PushBackend {
 /// utenti/{uid}/telefoni in memory: uid -> phone -> token.
 class FakePhones implements PhonesBackend {
   final phones = <String, Map<String, String>>{};
+  bool refuse = false; // as Firestore with rules that say no
 
   @override
   Future<bool> hasPhone(String uid, String phone) async => phones[uid]?.containsKey(phone) ?? false;
 
   @override
-  Future<void> savePhone(String uid, String phone, String token) async => (phones[uid] ??= {})[phone] = token;
+  Future<void> savePhone(String uid, String phone, String token) async {
+    if (refuse) throw Exception('[cloud_firestore/permission-denied] The caller does not have permission.');
+    (phones[uid] ??= {})[phone] = token;
+  }
 
   @override
   Future<void> removePhone(String uid, String phone) async => phones[uid]?.remove(phone);

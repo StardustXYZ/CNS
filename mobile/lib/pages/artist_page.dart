@@ -333,7 +333,7 @@ class _ArtistPageState extends State<ArtistPage> {
           ],
         ),
         const SizedBox(height: 8),
-        LinearProgressIndicator(value: queue.percent / 100, minHeight: 6, borderRadius: BorderRadius.circular(3)),
+        BookmarkBar(value: queue.percent / 100),
         const SizedBox(height: 4),
         Text(
           '${queue.done} di ${queue.total} (${queue.percent}%) · ascoltate ${queue.listenedCount}, '

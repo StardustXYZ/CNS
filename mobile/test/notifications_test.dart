@@ -1,3 +1,4 @@
+import 'package:cns/data/notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -5,6 +6,8 @@ import 'copia_test.dart' show settingsScroll;
 import 'fakes.dart';
 
 void main() {
+  setUp(() => NotificationStore.retryPause = Duration.zero);
+
   Future<TestApp> openSettings(WidgetTester tester, {void Function(TestApp app)? before}) async {
     tester.view.physicalSize = const Size(375 * 3, 812 * 3);
     tester.view.devicePixelRatio = 3;
@@ -85,5 +88,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(app.phones.phones['capo'], isEmpty);
     expect(find.text('Accedi con Google'), findsOneWidget);
+  });
+
+  testWidgets('il codice del telefono non arriva al primo colpo: riprova da sola e si accende', (tester) async {
+    final app = await openSettings(tester, before: (app) => app.push
+      ..allowed = true
+      ..tokenFailures = 1);
+    await tester.tap(find.text('Notifiche su questo telefono'));
+    await tester.pumpAndSettle();
+    expect(switchOn(tester), isTrue);
+    expect(app.phones.phones['capo'], {'telefono-di-prova': 'token-1'});
+  });
+
+  testWidgets("se non va, l'errore vero si legge sotto l'interruttore", (tester) async {
+    final app = await openSettings(tester, before: (app) {
+      app.push
+        ..allowed = true
+        ..tokenFailures = 2;
+    });
+    await tester.tap(find.text('Notifiche su questo telefono'));
+    await tester.pumpAndSettle();
+    expect(switchOn(tester), isFalse);
+    expect(find.textContaining('SERVICE_NOT_AVAILABLE'), findsOneWidget);
+
+    app.phones.refuse = true;
+    await tester.tap(find.text('Notifiche su questo telefono'));
+    await tester.pumpAndSettle();
+    expect(find.text('Firebase non ha salvato questo telefono (permission-denied).'), findsOneWidget);
+  });
+
+  test('describeError: il codice di Firebase, oppure le prime parole', () {
+    expect(describeError(Exception('[cloud_firestore/unavailable] The service is unavailable')), 'unavailable');
+    expect(describeError('x' * 200).length, 121);
   });
 }

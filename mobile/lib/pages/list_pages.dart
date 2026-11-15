@@ -208,7 +208,7 @@ class ArtistTile extends StatelessWidget {
                   if (progress != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: LinearProgressIndicator(value: progress, minHeight: 4, borderRadius: BorderRadius.circular(2)),
+                      child: BookmarkBar(value: progress, height: 4),
                     ),
                 ],
               ),
