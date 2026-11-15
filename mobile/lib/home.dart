@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'pages/impostazioni_page.dart';
 import 'pages/page_placeholder.dart';
 import 'theme.dart';
 
@@ -71,7 +72,10 @@ class _HomeShellState extends State<HomeShell> {
       body: PageView(
         controller: _pager,
         onPageChanged: (index) => setState(() => _current = index),
-        children: [for (final page in cnsPages) PagePlaceholder(page: page)],
+        children: [
+          for (final page in cnsPages.take(3)) PagePlaceholder(page: page),
+          const ImpostazioniPage(),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _current,

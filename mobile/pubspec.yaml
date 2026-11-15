@@ -3,16 +3,20 @@ description: "CNS - Chi Ni Sentimu: le uscite degli artisti che segui"
 publish_to: 'none' # private app, never published on pub.dev
 
 # versionName+versionCode on Android: raise both for every APK given to friends
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ^3.9.2
 
 dependencies:
+  cloud_firestore: ^7.1.0
+  firebase_auth: ^7.0.1
+  firebase_core: ^5.1.0
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:

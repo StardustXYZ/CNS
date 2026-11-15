@@ -1,15 +1,20 @@
+import 'package:cns/data/account.dart';
 import 'package:cns/home.dart';
 import 'package:cns/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'fake_account.dart';
+
 void main() {
-  // A narrow phone, as the 375 px of the web tests
+  // A narrow phone, as the 375 px of the web tests, signed in as the administrator
   Future<void> openApp(WidgetTester tester) async {
     tester.view.physicalSize = const Size(375 * 3, 812 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(const CnsApp());
+    await tester.pumpWidget(CnsApp(account: AccountStore(FakeBackend())));
+    await tester.tap(find.text('Accedi con Google')); // the pages need an admitted account
+    await tester.pumpAndSettle();
   }
 
   String selectedPage(WidgetTester tester) =>
@@ -36,7 +41,7 @@ void main() {
     expect(find.text('Le uscite nuove degli artisti che controlli, e quelle in arrivo.'), findsOneWidget);
     await tester.tap(menuItem('Impostazioni'));
     await tester.pumpAndSettle();
-    expect(find.text('Account, notifiche, persone ammesse e copia di sicurezza.'), findsOneWidget);
+    expect(find.text('Account'), findsOneWidget); // the real page, no longer the placeholder
   });
 
   testWidgets('scorrendo con il dito si passa alla pagina accanto', (tester) async {
