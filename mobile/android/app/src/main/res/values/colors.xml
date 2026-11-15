@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The colours of the app (lib/theme.dart and web/style.css) -->
+    <color name="cns_background">#0B0B0B</color>
+    <color name="cns_green">#008000</color>
+</resources>

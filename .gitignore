@@ -4,6 +4,14 @@
 !.env.example
 *-firebase-adminsdk-*.json
 service-account*.json
+# App Android: configurazione di Firebase, chiave di firma e le sue password restano sul PC
+google-services.json
+key.properties
+*.jks
+*.keystore
+# APK di prova dell'app Android: mai nel repository
+*.apk
+apk/
 
 # Python
 .venv/

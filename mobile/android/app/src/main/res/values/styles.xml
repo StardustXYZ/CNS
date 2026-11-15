@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CNS is always dark: the same theme with the phone in light or dark mode -->
+    <!-- While the app starts: black with the green headphones, without a white flash -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <!-- Behind the Flutter pages, once they are drawn -->
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@color/cns_background</item>
+    </style>
+</resources>
