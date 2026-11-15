@@ -11,11 +11,13 @@ import 'data/firebase_account.dart';
 import 'data/firebase_artists.dart';
 import 'data/firebase_backup.dart';
 import 'data/firebase_news.dart';
+import 'data/firebase_push.dart';
 import 'data/home_widget_sync.dart';
 import 'data/news.dart';
+import 'data/notifications.dart';
 import 'home.dart';
 import 'pages/account_pages.dart';
-import 'pages/impostazioni_page.dart' show BackupScope;
+import 'pages/impostazioni_page.dart' show BackupScope, NotificationScope;
 import 'pages/list_pages.dart';
 import 'pages/novita_page.dart';
 import 'pages/widgets.dart';
@@ -27,12 +29,16 @@ Future<void> main() async {
   ArtistsBackend? artistsBackend;
   NewsBackend? newsBackend;
   BackupBackend? backupBackend;
+  PushBackend? push;
+  PhonesBackend? phones;
   try {
     await Firebase.initializeApp(); // from android/app/google-services.json
     accountBackend = FirebaseAccountBackend();
     artistsBackend = FirebaseArtistsBackend();
     newsBackend = FirebaseNewsBackend();
     backupBackend = FirebaseBackupBackend();
+    push = FirebasePushBackend();
+    phones = FirebasePhonesBackend();
   } catch (err) {
     debugPrint('Firebase non avviato: $err'); // the access screen says that the account is not available
   }
@@ -42,6 +48,7 @@ Future<void> main() async {
   final news = NewsStore(account, newsBackend, FileSeenStore());
   final discographies = DiscographyStore(deezer, FileDiscoCache());
   final backup = BackupService(account, artists, news, backupBackend, PickerFiles());
+  final notifications = push != null && phones != null ? NotificationStore(account, phones, push) : null;
   runApp(
     CnsApp(
       account: account,
@@ -50,18 +57,37 @@ Future<void> main() async {
       discographies: discographies,
       news: news,
       backup: backup,
+      notifications: notifications,
     ),
   );
+  // Notifications: with the app open a message at the bottom; a tap opens Novità
+  if (push != null) {
+    push.foreground().listen(
+      (text) =>
+          messengerKey.currentState?.showSnackBar(SnackBar(content: Text(text), duration: const Duration(seconds: 8))),
+    );
+    push.openedLinks().listen((uri) => widgetLink.value = uri);
+    try {
+      final opened = await push.initialLink();
+      if (opened != null) widgetLink.value = opened;
+    } catch (err) {
+      debugPrint('Notifica di apertura non letta: $err');
+    }
+  }
   // The home screen widgets: their texts follow the app, a tap opens the right page
   try {
     final bridge = HomeWidgetBridge();
     WidgetSync(bridge, news, artists, discographies);
-    widgetLink.value = await bridge.initialLink();
+    final fromWidget = await bridge.initialLink();
+    if (fromWidget != null) widgetLink.value = fromWidget; // not over the link of a notification
     bridge.links.listen((uri) => widgetLink.value = uri);
   } catch (err) {
     debugPrint('Widget non disponibili: $err');
   }
 }
+
+/// For the messages at the bottom of the screen shown from outside the pages (notifications).
+final messengerKey = GlobalKey<ScaffoldMessengerState>();
 
 /// CNS (Chi Ni Sentimu): the releases of the artists you follow, on the phone.
 class CnsApp extends StatelessWidget {
@@ -73,6 +99,7 @@ class CnsApp extends StatelessWidget {
     required this.discographies,
     required this.news,
     required this.backup,
+    this.notifications,
   });
 
   // With fakes in the tests
@@ -82,6 +109,7 @@ class CnsApp extends StatelessWidget {
   final DiscographyStore discographies;
   final NewsStore news;
   final BackupService backup;
+  final NotificationStore? notifications; // null without Firebase
 
   @override
   Widget build(BuildContext context) {
@@ -98,15 +126,19 @@ class CnsApp extends StatelessWidget {
               store: news,
               child: BackupScope(
                 service: backup,
-                child: MaterialApp(
-                  title: 'CNS',
-                  debugShowCheckedModeBanner: false,
-                  theme: cnsTheme(),
-                  // Flutter's own texts (dates, "Annulla", "Incolla"…) in Italian
-                  locale: const Locale('it'),
-                  supportedLocales: const [Locale('it')],
-                  localizationsDelegates: GlobalMaterialLocalizations.delegates,
-                  home: const AccessGate(child: HomeShell()),
+                child: NotificationScope(
+                  store: notifications,
+                  child: MaterialApp(
+                    title: 'CNS',
+                    debugShowCheckedModeBanner: false,
+                    scaffoldMessengerKey: messengerKey,
+                    theme: cnsTheme(),
+                    // Flutter's own texts (dates, "Annulla", "Incolla"…) in Italian
+                    locale: const Locale('it'),
+                    supportedLocales: const [Locale('it')],
+                    localizationsDelegates: GlobalMaterialLocalizations.delegates,
+                    home: const AccessGate(child: HomeShell()),
+                  ),
                 ),
               ),
             ),

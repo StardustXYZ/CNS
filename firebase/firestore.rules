@@ -66,10 +66,25 @@ service cloud.firestore {
       allow create, update: if false;
     }
 
+    // The account's phones for the notifications of the Android app (Firebase Cloud
+    // Messaging): one document per installation of the app with its token. GitHub reads them
+    // and removes the ones that are gone
+    match /utenti/{uid}/telefoni/{phone} {
+      allow read, delete: if isUser(uid);
+      allow create, update: if isUser(uid) && validPhone(phone, request.resource.data);
+    }
+
     // Written by GitHub; the admitted accounts can see when GitHub last got in touch
     match /stato/{doc} {
       allow read: if isAllowed();
       allow write: if false;
+    }
+
+    function validPhone(phone, t) {
+      return phone.matches('^[A-Za-z0-9_-]{8,64}$')
+        && t.keys().hasOnly(['token', 'aggiornato'])
+        && t.token is string && t.token.size() > 0 && t.token.size() <= 4096
+        && (!('aggiornato' in t) || t.aggiornato is timestamp);
     }
 
     function validAllowList(d) {

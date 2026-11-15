@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter
+import contextlib
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 import os
@@ -39,7 +40,10 @@ from app.config import settings
 from app.prova_firebase import STATUS_PATH, run_url
 from app.services.deezer import DeezerClient, DeezerError, DeezerRelease, DiscographySource
 from app.services.discografia import KINDS, group_key, kind_of
-from app.services.firestore import DocumentStore, FirestoreClient, FirestoreError
+from app.services.fcm import FCM_SCOPES, FcmClient, PushSender
+from app.services.firestore import (
+    DocumentStore, FirestoreClient, FirestoreError, service_account_info, service_account_token,
+)
 from app.anteprime import (
     announced_titles_around, announcement_document, is_due_today, is_expired, itunes_fields, itunes_id_for, title_key,
 )
@@ -152,6 +156,10 @@ class Report:
     announced: int = 0
     reminders: int = 0
     not_admitted: int = 0
+    phones: int = 0  # phones registered in the Android app
+    push_sent: int = 0
+    push_errors: int = 0
+    phones_removed: int = 0  # the app was removed from the phone: its document goes away
 
 
 @dataclass
@@ -201,25 +209,53 @@ def is_admitted(uid: str, settings_doc: dict, allow_list: dict | None) -> bool:
 
 async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
                     sender_for: Callable[[str], NotificationSender], report: Report,
-                    allow_list: dict | None = None) -> None:
-    """Save the user's news in Novità and send the notifications to their topic."""
+                    allow_list: dict | None = None, phones: list[tuple[str, str]] | None = None,
+                    push: PushSender | None = None) -> None:
+    """Save the user's news in Novità and send the notifications to their ntfy topic and to
+    the phones registered in the Android app (``phones``: document path and token)."""
     settings_doc = await db.get(f"utenti/{uid}") or {}
     if not is_admitted(uid, settings_doc, allow_list):
         report.not_admitted += 1  # removed from the list: nothing more for them
         return
     for item in news.releases:
         await db.set(f"utenti/{uid}/novita/{item.release.id}", novita_document(item, now))
+    notifications = notifications_for(news, now)
+    phones = phones if push else []
     topic = str(settings_doc.get("ntfy") or "").strip()
     if not TOPIC_PATTERN.match(topic):
-        report.no_topic += 1  # still in the app: the notification waits for a topic in Impostazioni
-        return
-    sender = sender_for(topic)
-    for notification in notifications_for(news, now):
-        try:
-            await sender.send(notification)
-            report.notifications += 1
-        except Exception:  # noqa: BLE001 - one failed notification must not stop the others
-            report.notification_errors += 1
+        if not phones:
+            report.no_topic += 1  # still in the app: the notification waits for a topic or a phone
+    else:
+        sender = sender_for(topic)
+        for notification in notifications:
+            try:
+                await sender.send(notification)
+                report.notifications += 1
+            except Exception:  # noqa: BLE001 - one failed notification must not stop the others
+                report.notification_errors += 1
+    for path, token in phones or []:
+        for notification in notifications:
+            try:
+                delivered = await push.send(token, notification)
+            except Exception:  # noqa: BLE001 - one phone must not stop the others
+                report.push_errors += 1
+                continue
+            if not delivered:
+                await db.delete(path)  # the app is not on that phone any more
+                report.phones_removed += 1
+                break
+            report.push_sent += 1
+
+
+def phones_by_user(documents: list[tuple[str, dict]]) -> dict[str, list[tuple[str, str]]]:
+    """The phones of each person: "utenti/<code>/telefoni/<id>" -> {code: [(path, token)]}."""
+    found: dict[str, list[tuple[str, str]]] = {}
+    for path, data in documents:
+        parts = path.split("/")
+        token = data.get("token")
+        if len(parts) == 4 and parts[0] == "utenti" and parts[2] == "telefoni" and isinstance(token, str) and token:
+            found.setdefault(parts[1], []).append((path, token))
+    return found
 
 
 def announcements_by_user(documents: list[tuple[str, dict]]) -> dict[str, dict[str, dict]]:
@@ -269,14 +305,17 @@ async def check_announcements(db: DocumentStore, itunes: ReleaseSource, artist: 
 
 
 async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
-                    sender_for: Callable[[str], NotificationSender], itunes: ReleaseSource | None = None) -> list[str]:
+                    sender_for: Callable[[str], NotificationSender], itunes: ReleaseSource | None = None,
+                    push: PushSender | None = None) -> list[str]:
     """One run: read, compare, tell; returns the lines of the report (numbers only)."""
     artists = group_artists(await db.collection_group("artisti"))
     users = {uid for a in artists.values() for uid in a.followers}
     lists = Counter(data.get("lista") for a in artists.values() for data in a.followers.values())
     saved_announcements = announcements_by_user(await db.collection_group("anteprime")) if itunes else {}
     allow_list = await db.get(ALLOW_LIST_PATH)
+    phones = phones_by_user(await db.collection_group("telefoni")) if push else {}
     report = Report()
+    report.phones = sum(len(p) for p in phones.values())
     today = now.date()
     per_user: dict[str, UserNews] = {}
     for artist in (a for a in artists.values() if a.to_check):
@@ -318,7 +357,7 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
     for uid, user_news in per_user.items():
         if user_news:
             report.users_told += 1
-            await tell_user(db, uid, user_news, now, sender_for, report, allow_list)
+            await tell_user(db, uid, user_news, now, sender_for, report, allow_list, phones.get(uid, []), push)
     await db.set(STATUS_PATH, {
         "ultimo_contatto": now,
         "origine": "controllo",
@@ -347,7 +386,11 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
         f"| Persone avvisate | {report.users_told} |",
         f"| Notifiche inviate | {report.notifications} |",
         f"| Notifiche non riuscite | {report.notification_errors} |",
-        f"| Persone senza argomento ntfy (solo in Novità) | {report.no_topic} |",
+        f"| Telefoni con l'app Android | {report.phones} |",
+        f"| Notifiche inviate all'app | {report.push_sent} |",
+        f"| Notifiche all'app non riuscite | {report.push_errors} |",
+        f"| Telefoni tolti (app disinstallata) | {report.phones_removed} |",
+        f"| Persone senza notifiche (solo in Novità) | {report.no_topic} |",
         f"| Persone non più ammesse (saltate) | {report.not_admitted} |",
     ]
 
@@ -367,8 +410,16 @@ async def run() -> tuple[str, bool]:
     now = datetime.now(ZoneInfo(settings.TIMEZONE)).replace(microsecond=0)
     start = time.perf_counter()
     try:
-        async with FirestoreClient.from_settings() as db, DeezerClient() as deezer, ItunesClient() as itunes:
-            lines, ok = await run_check(db, deezer, now, ntfy_sender, itunes), True
+        info = service_account_info()
+        project = info.get("project_id") or settings.FIREBASE_PROJECT_ID
+        try:  # without FCM the check goes on: ntfy and Novità do not need it
+            push_token = await asyncio.to_thread(service_account_token, info, FCM_SCOPES)
+        except Exception:  # noqa: BLE001 - google-auth raises its own errors
+            push_token = None
+        fcm_client = FcmClient(project, push_token) if push_token else contextlib.nullcontext()
+        async with (FirestoreClient.from_settings() as db, DeezerClient() as deezer, ItunesClient() as itunes,
+                    fcm_client as fcm):
+            lines, ok = await run_check(db, deezer, now, ntfy_sender, itunes, fcm), True
         lines.append(f"Durata: {time.perf_counter() - start:.1f} secondi.")
     except FirestoreError as err:
         lines, ok = [f"❌ {err}"], False

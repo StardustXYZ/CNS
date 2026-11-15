@@ -263,7 +263,7 @@ Come CNV: un'app Android vera accanto all'app web, che legge e scrive **gli stes
 
     Toccandolo si apre l'app nel punto giusto. Il widget mostra i dati salvati dall'app l'ultima volta che è stata aperta. Con le notifiche native della Fase 8.7 si aggiorna anche quando arriva una novità.
 - [x] **8.6 Copia di sicurezza** — fatta il 15/11/2026 (provata sul telefono; file di prova in `tests/fixtures/copia_web.json` e `copia_app.json`) compatibile con quella dell'app web (un file fatto dal web si ripristina nell'app e viceversa).
-- [ ] **8.7 Notifiche native (FCM)**: permesso di Android 13, scelta salvata nell'account, telefoni in `utenti/{uid}/telefoni`, regole nuove, invio dal controllo di GitHub, notte senza suono con un canale silenzioso, tocco che apre l'uscita nell'app. Poi ntfy tolto o lasciato, secondo la decisione 1.
+- [x] **8.7 Notifiche native (FCM)** — fatta il 15/11/2026 (regole incollate nella console, telefono registrato; prova d'invio con il workflow "Prova notifiche"). ntfy resta per chi usa solo il web: permesso di Android 13, scelta salvata nell'account, telefoni in `utenti/{uid}/telefoni`, regole nuove, invio dal controllo di GitHub, notte senza suono con un canale silenzioso, tocco che apre l'uscita nell'app. Poi ntfy tolto o lasciato, secondo la decisione 1.
 - [ ] **8.8 Versione firmata e pubblicazione**: chiave di firma, release su GitHub `app-vX.Y.Z` (non pre-release) con l'APK, avviso di aggiornamento nell'app, pagina Privacy, "Elimina l'account" (che cancella anche artisti, Novità, In arrivo e telefoni), README.
 - [ ] **8.9 Prova con gli amici.**
 

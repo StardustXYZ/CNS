@@ -2,8 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../data/backup.dart';
 import '../data/copia.dart' show BackupError, ParsedBackup;
+import '../data/notifications.dart';
 import '../theme.dart';
 import 'account_pages.dart';
+
+/// Gives the pages the notifications of this phone (null without Firebase, as in some tests).
+class NotificationScope extends InheritedNotifier<NotificationStore> {
+  const NotificationScope({super.key, required NotificationStore? store, required super.child})
+    : super(notifier: store);
+
+  static NotificationStore? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<NotificationScope>()?.notifier;
+}
 
 /// Gives the Impostazioni page the backup ("Salva la copia", "Ripristina").
 class BackupScope extends InheritedWidget {
@@ -17,8 +27,8 @@ class BackupScope extends InheritedWidget {
   bool updateShouldNotify(BackupScope oldWidget) => service != oldWidget.service;
 }
 
-/// Impostazioni: the account (with the allow list for the administrator) and the backup copy;
-/// the notifications on the phone arrive in phase 8.7.
+/// Impostazioni: the account (with the allow list for the administrator), the notifications on
+/// this phone and the backup copy.
 class ImpostazioniPage extends StatelessWidget {
   const ImpostazioniPage({super.key});
 
@@ -26,17 +36,7 @@ class ImpostazioniPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: const [
-        AccountCard(),
-        SettingsCard(
-          title: 'Notifiche',
-          child: Text(
-            'Le notifiche sul telefono arrivano in una delle prossime versioni. '
-            'Intanto restano quelle di ntfy, che scegli nell’app web.',
-          ),
-        ),
-        BackupCard(),
-      ],
+      children: const [AccountCard(), NotificationsCard(), BackupCard()],
     );
   }
 }
@@ -233,6 +233,53 @@ class _BackupCardState extends State<BackupCard> {
               padding: const EdgeInsets.only(top: 8),
               child: Text(_message!, style: TextStyle(color: _ok ? CnsColors.accent : CnsColors.red)),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Notifiche": the switch for this phone, and a word about ntfy (the web app's notifications).
+class NotificationsCard extends StatelessWidget {
+  const NotificationsCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final store = NotificationScope.of(context);
+    return SettingsCard(
+      title: 'Notifiche',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (store == null)
+            const Text('Le notifiche non sono disponibili in questa versione dell’app.')
+          else ...[
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: store.on,
+              onChanged: store.ready && !store.busy ? store.setOn : null,
+              title: const Text(
+                'Notifiche su questo telefono',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: CnsColors.text),
+              ),
+              subtitle: Text(
+                store.on
+                    ? '✓ Ti avviso qui quando un artista di Controllare pubblica qualcosa, e il giorno delle uscite in arrivo.'
+                    : 'Accendile per ricevere qui le uscite nuove: toccando la notifica si apre la pagina Novità.',
+              ),
+            ),
+            if (store.loading || store.busy) const LinearProgressIndicator(minHeight: 2),
+            if (store.problem != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(store.problem!, style: const TextStyle(color: CnsColors.yellow)),
+              ),
+            const SizedBox(height: 6),
+            const Text(
+              'Di notte (dalle 23 alle 8) arrivano senza suono. Se ricevi anche quelle di ntfy e ti bastano '
+              'queste, togli l’argomento ntfy nelle Impostazioni dell’app web.',
+            ),
+          ],
         ],
       ),
     );

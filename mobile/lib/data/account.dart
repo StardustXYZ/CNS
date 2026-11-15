@@ -68,6 +68,9 @@ class AccountStore extends ChangeNotifier {
 
   bool get isAdmin => allowed != null;
 
+  /// Run before signing out, while still signed in (e.g. to unregister this phone).
+  final beforeSignOut = <Future<void> Function()>[];
+
   void _onUser(AccountUser? u) {
     final changed = u?.uid != user?.uid || u?.verified != user?.verified;
     user = u;
@@ -131,7 +134,12 @@ class AccountStore extends ChangeNotifier {
   Future<void> register(String email, String password) => _run((b) => b.register(email.trim(), password));
   Future<void> sendPasswordReset(String email) => _run((b) => b.sendPasswordReset(email.trim()));
   Future<void> sendVerification() => _run((b) => b.sendVerification());
-  Future<void> signOut() => _run((b) => b.signOut());
+  Future<void> signOut() => _run((b) async {
+        for (final hook in [...beforeSignOut]) {
+          await hook();
+        }
+        await b.signOut();
+      });
 
   /// "Ho confermato": reads the account again; if the e-mail is now confirmed, checks the list.
   Future<bool> reloadVerified() async {

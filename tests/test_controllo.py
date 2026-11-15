@@ -167,7 +167,7 @@ async def test_without_a_topic_the_news_waits_in_novita():
     ntfy = FakeNtfy()
     lines = await run_check(store, FakeDeezer({AVA: AVA_OLD + [rel(3, "Christmas Wonderland", "2026-11-06")]}), NOW, ntfy)
     assert ntfy.sent == [] and "utenti/vincenzo/novita/3" in store.docs
-    assert "| Persone senza argomento ntfy (solo in Novità) | 1 |" in lines
+    assert "| Persone senza notifiche (solo in Novità) | 1 |" in lines  # no ntfy topic and no phone
 
 
 async def test_deezer_or_ntfy_errors_do_not_stop_the_run():

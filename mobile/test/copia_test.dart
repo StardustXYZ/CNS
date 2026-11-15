@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:cns/data/artists.dart';
 import 'package:cns/data/backup.dart';
 import 'package:cns/data/copia.dart';
+import 'package:cns/pages/impostazioni_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -128,7 +129,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Impostazioni')));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Salva la copia')); // the page scrolls down to the card
+      await tester.scrollUntilVisible(find.text('Salva la copia'), 300, scrollable: settingsScroll());
       await tester.pumpAndSettle();
       return (app, app.files);
     }
@@ -173,3 +174,6 @@ void main() {
 }
 
 int fatteFromJsonCount(Object? value) => value is Map ? value.length : 0;
+
+/// The scrolling list of the Impostazioni page.
+Finder settingsScroll() => find.descendant(of: find.byType(ImpostazioniPage), matching: find.byType(Scrollable)).first;

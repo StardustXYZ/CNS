@@ -114,12 +114,13 @@ def service_account_info(raw: str | None = None) -> dict:
     return info
 
 
-def service_account_token(info: dict) -> str:
-    """An access token for Firestore, signed with the service account key (valid one hour)."""
+def service_account_token(info: dict, scopes: list[str] | None = None) -> str:
+    """An access token for Firestore (or for ``scopes``, e.g. FCM), signed with the service
+    account key (valid one hour)."""
     from google.auth.transport.requests import Request
     from google.oauth2 import service_account
 
-    credentials = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+    credentials = service_account.Credentials.from_service_account_info(info, scopes=scopes or SCOPES)
     credentials.refresh(Request())
     return credentials.token
 

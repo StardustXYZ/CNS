@@ -7,6 +7,7 @@ import 'package:cns/data/deezer.dart';
 import 'package:cns/data/discografia.dart';
 import 'package:cns/data/discography_store.dart';
 import 'package:cns/data/news.dart';
+import 'package:cns/data/notifications.dart';
 import 'package:cns/main.dart';
 
 import 'copia_test.dart' show FakeFiles;
@@ -173,6 +174,54 @@ class FakeBackupBackend implements BackupBackend {
       settings[uid] = {...?settings[uid], ...fields};
 }
 
+/// Firebase Messaging on a phone, in memory.
+class FakePush implements PushBackend {
+  bool allowed = false; // what Android answers to the request
+  bool granted = false; // already granted
+  String? currentToken = 'token-1';
+  final refresh = StreamController<String>.broadcast();
+  final asked = <String>[];
+
+  @override
+  Future<bool> requestPermission() async {
+    asked.add('permesso');
+    granted = granted || allowed;
+    return granted;
+  }
+
+  @override
+  Future<bool> hasPermission() async => granted;
+
+  @override
+  Future<String?> token() async => currentToken;
+
+  @override
+  Stream<String> tokenRefresh() => refresh.stream;
+
+  @override
+  Stream<String> foreground() => const Stream.empty();
+
+  @override
+  Future<Uri?> initialLink() async => null;
+
+  @override
+  Stream<Uri> openedLinks() => const Stream.empty();
+}
+
+/// utenti/{uid}/telefoni in memory: uid -> phone -> token.
+class FakePhones implements PhonesBackend {
+  final phones = <String, Map<String, String>>{};
+
+  @override
+  Future<bool> hasPhone(String uid, String phone) async => phones[uid]?.containsKey(phone) ?? false;
+
+  @override
+  Future<void> savePhone(String uid, String phone, String token) async => (phones[uid] ??= {})[phone] = token;
+
+  @override
+  Future<void> removePhone(String uid, String phone) async => phones[uid]?.remove(phone);
+}
+
 /// The whole app with fakes: account, artists, Deezer and the copy of the discographies.
 class TestApp {
   TestApp() {
@@ -182,6 +231,7 @@ class TestApp {
     news = NewsStore(account, newsBackend, seen, now: () => clock);
     backupBackend = FakeBackupBackend(artistsBackend);
     backup = BackupService(account, artists, news, backupBackend, files, now: () => clock);
+    notifications = NotificationStore(account, phones, push, phoneId: () async => 'telefono-di-prova');
   }
 
   final accountBackend = FakeBackend();
@@ -198,6 +248,9 @@ class TestApp {
   late final FakeBackupBackend backupBackend;
   late final BackupService backup;
   final files = FakeFiles();
+  final push = FakePush();
+  final phones = FakePhones();
+  late final NotificationStore notifications;
 
   CnsApp get widget => CnsApp(
         account: account,
@@ -206,5 +259,6 @@ class TestApp {
         discographies: discos,
         news: news,
         backup: backup,
+        notifications: notifications,
       );
 }

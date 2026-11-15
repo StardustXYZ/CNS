@@ -1,0 +1,37 @@
+# Prova delle notifiche dell'app Android (Firebase Cloud Messaging): controlla che l'API di FCM
+# risponda e manda una notifica di prova ai telefoni dell'amministratore (config/ammessi.admin).
+# Parte da sola quando la prova o il client di FCM cambiano (su qualsiasi ramo), oppure a mano da
+# Actions -> "Prova notifiche" -> Run workflow. Serve il segreto FIREBASE_SERVICE_ACCOUNT.
+name: Prova notifiche
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/prova-notifiche.yml"
+      - "app/prova_notifiche.py"
+      - "app/services/fcm.py"
+
+permissions:
+  contents: read
+
+jobs:
+  prova:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: Europe/Rome
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Installa CNS
+        run: pip install -e .
+
+      - name: Controlla FCM e manda la prova
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: python -m app.prova_notifiche

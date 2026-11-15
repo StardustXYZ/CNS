@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { after, before, beforeEach, test } from "node:test";
 import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 
 let env;
 
@@ -116,6 +116,27 @@ test("le uscite in arrivo le scrive solo GitHub: si leggono, non si scrivono, gl
     await assertSucceeds(getDocs(collection(db, "utenti/vincenzo/anteprime")));
     await assertFails(setDoc(doc(db, "utenti/vincenzo/anteprime/951"), { titolo: "Falsa" }));
     await assertFails(getDocs(collection(as("amico"), "utenti/vincenzo/anteprime")));
+});
+
+// ---- Telefoni per le notifiche dell'app Android (Fase 8.7) ----
+
+test("ognuno registra e toglie i suoi telefoni, gli altri no", async () => {
+    const db = as("vincenzo");
+    const phone = doc(db, "utenti/vincenzo/telefoni/abcdefgh12345678");
+    await assertSucceeds(setDoc(phone, { token: "token-di-prova", aggiornato: serverTimestamp() }));
+    await assertSucceeds(getDocs(collection(db, "utenti/vincenzo/telefoni")));
+    await assertFails(getDocs(collection(as("amico"), "utenti/vincenzo/telefoni")));
+    await assertFails(setDoc(doc(as("amico"), "utenti/vincenzo/telefoni/abcdefgh12345678"), { token: "rubato" }));
+    await assertSucceeds(deleteDoc(phone));
+});
+
+test("un telefono ha solo il token (non vuoto) e la data, con un nome valido", async () => {
+    const db = as("vincenzo");
+    await assertFails(setDoc(doc(db, "utenti/vincenzo/telefoni/corto"), { token: "t" }));
+    await assertFails(setDoc(doc(db, "utenti/vincenzo/telefoni/abcdefgh12345678"), { token: "" }));
+    await assertFails(setDoc(doc(db, "utenti/vincenzo/telefoni/abcdefgh12345678"), { token: "t", altro: 1 }));
+    await assertFails(setDoc(doc(db, "utenti/vincenzo/telefoni/abcdefgh12345678"), { token: "t", aggiornato: "ieri" }));
+    await assertFails(setDoc(doc(as("estraneo"), "utenti/estraneo/telefoni/abcdefgh12345678"), { token: "t" }));
 });
 
 // ---- Lista degli ammessi (2d) ----

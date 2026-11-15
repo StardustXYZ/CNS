@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Deezer, iTunes and Firebase: the app works only online -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Notifications of the new releases (Android 13+ asks the person first) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:label="CNS"
         android:name="${applicationName}"
@@ -31,6 +33,17 @@
                 <action android:name="es.antonborri.home_widget.action.LAUNCH" />
             </intent-filter>
         </activity>
+        <!-- Notifications (Firebase Cloud Messaging): the white headphones, in the app's green,
+             on the channel "uscite" created in MainActivity -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notifica" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/cns_green" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="uscite" />
         <!-- Home screen widgets: "Ultime uscite" and "Prossimo da recuperare" -->
         <receiver android:name=".UltimeUsciteWidget" android:exported="false">
             <intent-filter>
