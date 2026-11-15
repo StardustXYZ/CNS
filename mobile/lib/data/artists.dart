@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 
 import 'account.dart';
 import 'deezer.dart';
+import 'discografia.dart' show kinds;
+import 'segnalibro.dart';
 
 /// The three lists of the web app: Controllare, Recuperando and the Archivio under Recuperando.
 abstract final class Lists {
@@ -46,7 +48,28 @@ class SavedArtist {
   final String link;
   final int fan;
   final String nota;
-  final Map<String, dynamic> data; // everything else (bookmark, alerts…), for the next phases
+  final Map<String, dynamic> data; // everything, also the bookmark and the alerts
+
+  /// The bookmark of Recuperando (web/segnalibro.js writes the same map).
+  Fatte get fatte => fatteFromJson(data['fatte']);
+
+  /// The kinds this artist's catch-up includes (compilations are out by default).
+  List<String> get tipiRecupero => _kinds(data['tipi_recupero']) ?? defaultKinds;
+
+  /// The kinds of release this person is told about for this artist (all, unless changed).
+  List<String> get tipiAvviso => _kinds(data['tipi_avviso']) ?? kinds.keys.toList();
+
+  /// "Quando finisco, sposta in automatico in Controllare".
+  bool get autoSposta => data['auto_sposta'] == true;
+
+  /// "Tieni qui" chosen at the end of the discography.
+  bool get fineTenuta => data['fine_tenuta'] == true;
+
+  static List<String>? _kinds(Object? value) {
+    if (value is! List) return null;
+    final list = [for (final k in value) if (k is String && kinds.containsKey(k)) k];
+    return list.isEmpty ? null : list;
+  }
 }
 
 /// Firestore behind an interface, so the tests can do without it.
@@ -56,6 +79,9 @@ abstract class ArtistsBackend {
   /// Adds artists found on Deezer to a list, all together (the import adds many).
   Future<void> add(String uid, List<DeezerArtist> artists, String lista);
   Future<void> move(String uid, String id, String lista);
+
+  /// Changes some fields (list, note, bookmark, alerts…); the others stay.
+  Future<void> update(String uid, String id, Map<String, dynamic> fields);
   Future<void> remove(String uid, String id);
 }
 
@@ -149,6 +175,7 @@ class ArtistStore extends ChangeNotifier {
   }
 
   Future<void> move(String id, String lista) => _run((b, uid) => b.move(uid, id, lista));
+  Future<void> update(String id, Map<String, dynamic> fields) => _run((b, uid) => b.update(uid, id, fields));
   Future<void> remove(String id) => _run((b, uid) => b.remove(uid, id));
 
   @override

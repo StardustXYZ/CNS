@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import 'discografia.dart';
+
 /// An artist as Deezer describes it.
 class DeezerArtist {
   const DeezerArtist({
@@ -52,6 +54,9 @@ abstract class DeezerApi {
 
   /// Where a short link (link.deezer.com/…) leads; other links come back as they are.
   Future<String> resolveLink(String link);
+
+  /// Every release of an artist's discography (all pages), as Deezer lists them.
+  Future<List<Release>> discography(String artistId);
 }
 
 /// The public Deezer API, without a key. From the phone it answers directly (no JSONP as
@@ -63,6 +68,7 @@ class DeezerClient implements DeezerApi {
   static const _timeout = Duration(seconds: 12);
   static const _pageSize = 100;
   static const _maxPages = 20; // a safety stop: 2000 favourite artists
+  static const _maxDiscographyPages = 50; // a safety stop: 5000 releases, as the web app
 
   final http.Client _http;
 
@@ -115,6 +121,19 @@ class DeezerClient implements DeezerApi {
           {'limit': '$_pageSize', 'index': '${page * _pageSize}'});
       final items = _items(data);
       found.addAll(items.map(DeezerArtist.fromApi));
+      if (data['next'] == null || items.isEmpty) break;
+    }
+    return found;
+  }
+
+  @override
+  Future<List<Release>> discography(String artistId) async {
+    final found = <Release>[];
+    for (var page = 0; page < _maxDiscographyPages; page++) {
+      final data = await _get('/artist/${Uri.encodeComponent(artistId)}/albums',
+          {'limit': '$_pageSize', 'index': '${page * _pageSize}'});
+      final items = _items(data);
+      found.addAll(items.map(Release.fromApi));
       if (data['next'] == null || items.isEmpty) break;
     }
     return found;

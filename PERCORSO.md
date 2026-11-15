@@ -246,7 +246,7 @@ Come CNV: un'app Android vera accanto all'app web, che legge e scrive **gli stes
     - da un **elenco di nomi incollato**, uno per riga: ogni nome viene cercato su Deezer, con una pausa tra le ricerche, usando la stessa regola "nome uguale con più fan".
 
     Prima di salvare, una schermata mostra cosa è stato trovato. Lì puoi togliere gli artisti sbagliati e scegliere se metterli in Controllare o in Recuperando. Chi è già in una lista viene saltato. Se il profilo è privato, l'app lo dice chiaramente.
-- [ ] **8.4 Pagina dell'artista**: lista, nota, avvisi, discografia con i doppioni uniti e la copia sul telefono, segnalibro (Ascoltato, Salta, Annulla, Arrivato qui, fine discografia), pulsanti Spotify e Deezer.
+- [ ] **8.4 Pagina dell'artista** — prima parte fatta il 15/11/2026 (provata sul telefono; mancano le funzioni *Nuovo* qui sotto): lista, nota, avvisi, discografia con i doppioni uniti e la copia sul telefono, segnalibro (Ascoltato, Salta, Annulla, Arrivato qui, fine discografia), pulsanti Spotify e Deezer.
   - [ ] *Nuovo* – **Lista delle canzoni** di ogni uscita: toccandola si apre l'elenco dei brani, con numero, titolo e durata, la durata totale e i dischi separati se sono più di uno.
   - [ ] *Nuovo* – **Ordine libero**: non serve più seguire l'ordine della discografia.
     - Ogni uscita ha il suo "✓ Ascoltato", accanto ad "Arrivato qui".

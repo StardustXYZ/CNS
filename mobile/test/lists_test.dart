@@ -21,7 +21,7 @@ void main() {
 
   void seed(TestApp app, List<(String, String, String)> artists) {
     app.artistsBackend.docs['capo'] = {
-      for (final (id, nome, lista) in artists) id: SavedArtist(id: id, nome: nome, lista: lista, fan: 1200000),
+      for (final (id, nome, lista) in artists) id: {'nome': nome, 'lista': lista, 'fan': 1200000},
     };
   }
 
@@ -65,7 +65,7 @@ void main() {
     expect(names.first, 'Amy Lee');
     await tester.tap(find.widgetWithText(FilledButton, 'Aggiungi').first);
     await tester.pumpAndSettle();
-    expect(app.artistsBackend.docs['capo']!['15741']!.lista, Lists.controllare);
+    expect(app.artistsBackend.saved('capo', '15741')!.lista, Lists.controllare);
     expect(find.text('Già in lista ✓'), findsOneWidget);
 
     // Lo stesso artista cercato da Recuperando: "Sposta qui"
@@ -81,28 +81,24 @@ void main() {
     expect(find.textContaining('in Controllare'), findsOneWidget);
     await tester.tap(find.text('Sposta qui'));
     await tester.pumpAndSettle();
-    expect(app.artistsBackend.docs['capo']!['15741']!.lista, Lists.recuperando);
+    expect(app.artistsBackend.saved('capo', '15741')!.lista, Lists.recuperando);
   });
 
-  testWidgets('dalla scheda dell\'artista: sposta in un\'altra lista e togli con conferma', (tester) async {
+  testWidgets("dalla pagina dell'artista: sposta in un'altra lista e togli con conferma", (tester) async {
     final app = await openApp(tester, before: (app) => seed(app, [('27', 'Daft Punk', Lists.controllare)]));
     await tester.tap(find.text('Daft Punk'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Sposta in Archivio'));
+    await tester.tap(find.descendant(of: find.byType(SegmentedButton<String>), matching: find.text('Archivio')));
     await tester.pumpAndSettle();
-    expect(app.artistsBackend.docs['capo']!['27']!.lista, Lists.archivio);
-    await tester.tap(menu('Recuperando'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Archivio (1)'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Daft Punk'));
-    await tester.pumpAndSettle();
+    expect(app.artistsBackend.saved('capo', '27')!.lista, Lists.archivio);
+    await tester.scrollUntilVisible(find.text('Togli dalle liste'), 300, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.text('Togli dalle liste'));
     await tester.pumpAndSettle();
     expect(find.text('Togliere Daft Punk?'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Togli'));
     await tester.pumpAndSettle();
     expect(app.artistsBackend.docs['capo'], isEmpty);
+    expect(find.text('Nessun artista da controllare per ora.'), findsOneWidget); // back to the list
   });
 
   testWidgets("importa da un elenco: controllo, spunte e destinazione", (tester) async {
@@ -123,10 +119,10 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Aggiungi 2 artisti'));
     await tester.pumpAndSettle();
-    final saved = app.artistsBackend.docs['capo']!;
-    expect(saved['15741']!.lista, Lists.recuperando);
-    expect(saved['27']!.lista, Lists.recuperando);
-    expect(saved['13']!.lista, Lists.controllare); // già salvato: non spostato
+    final saved = app.artistsBackend.saved;
+    expect(saved('capo', '15741')!.lista, Lists.recuperando);
+    expect(saved('capo', '27')!.lista, Lists.recuperando);
+    expect(saved('capo', '13')!.lista, Lists.controllare); // già salvato: non spostato
     expect(app.artistsBackend.writes, 1); // tutti insieme
     expect(find.text('Aggiunti 2 artisti a Recuperando.'), findsOneWidget);
   });

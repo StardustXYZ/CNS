@@ -38,5 +38,8 @@ class FirebaseArtistsBackend implements ArtistsBackend {
   Future<void> move(String uid, String id, String lista) => _artists(uid).doc(id).update({'lista': lista});
 
   @override
+  Future<void> update(String uid, String id, Map<String, dynamic> fields) => _artists(uid).doc(id).update(fields);
+
+  @override
   Future<void> remove(String uid, String id) => _artists(uid).doc(id).delete();
 }

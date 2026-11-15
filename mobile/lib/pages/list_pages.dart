@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../data/artists.dart';
 import '../data/deezer.dart';
+import '../data/discografia.dart' show groupReleases;
+import '../data/segnalibro.dart' show queueOf;
 import '../theme.dart';
-import 'account_pages.dart' show attempt, say;
+import 'artist_page.dart';
 import 'import_page.dart';
 import 'search_page.dart';
+import 'widgets.dart';
 
 /// Gives the pages the account's artists (and rebuilds them when they change).
 class ArtistsScope extends InheritedNotifier<ArtistStore> {
@@ -155,7 +158,8 @@ class _EmptyList extends StatelessWidget {
   }
 }
 
-/// One artist of a list: photo, name, and the note or the fans.
+/// One artist of a list: photo, name, and the note or the fans; in Recuperando, how far the
+/// bookmark is and what comes next (as the web app).
 class ArtistTile extends StatelessWidget {
   const ArtistTile({super.key, required this.artist});
 
@@ -163,7 +167,20 @@ class ArtistTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final detail = artist.nota.isNotEmpty ? artist.nota : (artist.fan > 0 ? fansLabel(artist.fan) : '');
+    var detail = artist.nota.isNotEmpty ? artist.nota : (artist.fan > 0 ? fansLabel(artist.fan) : '');
+    double? progress;
+    if (artist.lista == Lists.recuperando) {
+      final entry = DiscographyScope.of(context).ensure(artist.id);
+      if (entry.state == LoadState.ok) {
+        final queue = queueOf(groupReleases(entry.releases, artist.nome), artist.fatte, artist.tipiRecupero);
+        if (queue.finished) {
+          detail = 'Discografia finita 🎉';
+        } else if (queue.next != null) {
+          detail = '${queue.done} di ${queue.total} · prossima: ${queue.next!.main.title}';
+          progress = queue.percent / 100;
+        }
+      }
+    }
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       color: CnsColors.surface,
@@ -176,73 +193,21 @@ class ArtistTile extends StatelessWidget {
         title: Text(artist.nome, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: detail.isEmpty
             ? null
-            : Text(detail, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: CnsColors.textMuted)),
-        trailing: const Icon(Icons.more_vert, color: CnsColors.textMuted),
-        onTap: () => showArtistSheet(context, artist),
-      ),
-    );
-  }
-}
-
-/// Until the artist page arrives (phase 8.4): move the artist to another list, or remove it.
-Future<void> showArtistSheet(BuildContext context, SavedArtist artist) async {
-  final store = ArtistsScope.of(context);
-  final choice = await showModalBottomSheet<String>(
-    context: context,
-    backgroundColor: CnsColors.surface,
-    showDragHandle: true,
-    builder: (sheet) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: ArtistPhoto(url: artist.foto, size: 40),
-            title: Text(artist.nome, style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text('In ${Lists.labels[artist.lista] ?? artist.lista}'),
-          ),
-          const Divider(height: 1),
-          for (final lista in Lists.labels.keys)
-            if (lista != artist.lista)
-              ListTile(
-                leading: const Icon(Icons.drive_file_move_outline),
-                title: Text('Sposta in ${Lists.labels[lista]}'),
-                onTap: () => Navigator.of(sheet).pop(lista),
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(detail,
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: CnsColors.textMuted)),
+                  if (progress != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: LinearProgressIndicator(value: progress, minHeight: 4, borderRadius: BorderRadius.circular(2)),
+                    ),
+                ],
               ),
-          ListTile(
-            leading: const Icon(Icons.delete_outline, color: CnsColors.red),
-            title: const Text('Togli dalle liste', style: TextStyle(color: CnsColors.red)),
-            onTap: () => Navigator.of(sheet).pop('togli'),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
-            child: Text('La pagina completa dell’artista, con la discografia, arriva nella prossima versione.',
-                style: TextStyle(fontSize: 12, color: CnsColors.textMuted)),
-          ),
-        ],
-      ),
-    ),
-  );
-  if (choice == null || !context.mounted) return;
-  if (choice == 'togli') {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialog) => AlertDialog(
-        title: Text('Togliere ${artist.nome}?'),
-        content: const Text('Sparisce dalle tue liste, anche nell’app web. La nota e il segnalibro andranno persi.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(dialog).pop(false), child: const Text('Annulla')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: CnsColors.red),
-            onPressed: () => Navigator.of(dialog).pop(true),
-            child: const Text('Togli'),
-          ),
-        ],
+        trailing: const Icon(Icons.chevron_right, color: CnsColors.textMuted),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ArtistPage(artistId: artist.id))),
       ),
     );
-    if (ok == true && context.mounted && await attempt(context, () => store.remove(artist.id)) && context.mounted) {
-      say(context, '${artist.nome} tolto dalle liste.');
-    }
-  } else if (await attempt(context, () => store.move(artist.id, choice)) && context.mounted) {
-    say(context, '${artist.nome} spostato in ${Lists.labels[choice]}.');
   }
 }
