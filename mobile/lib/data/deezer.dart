@@ -57,6 +57,12 @@ abstract class DeezerApi {
 
   /// Every release of an artist's discography (all pages), as Deezer lists them.
   Future<List<Release>> discography(String artistId);
+
+  /// The songs of a release, in order.
+  Future<List<Track>> tracks(String releaseId);
+
+  /// The artists Deezer considers similar ("Ti potrebbero piacere").
+  Future<List<DeezerArtist>> related(String artistId);
 }
 
 /// The public Deezer API, without a key. From the phone it answers directly (no JSONP as
@@ -137,6 +143,18 @@ class DeezerClient implements DeezerApi {
       if (data['next'] == null || items.isEmpty) break;
     }
     return found;
+  }
+
+  @override
+  Future<List<Track>> tracks(String releaseId) async {
+    final data = await _get('/album/${Uri.encodeComponent(releaseId)}/tracks', {'limit': '500'});
+    return _items(data).map(Track.fromApi).toList();
+  }
+
+  @override
+  Future<List<DeezerArtist>> related(String artistId) async {
+    final data = await _get('/artist/${Uri.encodeComponent(artistId)}/related', {'limit': '20'});
+    return _items(data).map(DeezerArtist.fromApi).toList();
   }
 
   @override

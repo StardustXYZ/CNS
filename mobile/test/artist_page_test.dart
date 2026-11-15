@@ -83,15 +83,30 @@ void main() {
 
   testWidgets('«Arrivato qui» nella discografia, e «annulla» su una sola uscita', (tester) async {
     final app = await openArtist(tester, Lists.recuperando);
-    await tester.scrollUntilVisible(find.text('Worlds Collection'), 300, scrollable: find.byType(Scrollable).first);
-    await tester.ensureVisible(find.text('Arrivato qui').at(1));
+    // The «Arrivato qui» of the row of Legends Never Die (the rows above may not be built)
+    final row = find.ancestor(
+      of: find.text('Legends Never Die'),
+      matching: find.byWidgetPredicate((w) => w is Container && w.decoration is BoxDecoration
+          && (w.decoration as BoxDecoration).border != null),
+    );
+    await tester.scrollUntilVisible(find.text('Legends Never Die'), 300, scrollable: find.byType(Scrollable).first);
+    final upTo = find.descendant(of: row.first, matching: find.text('Arrivato qui'));
+    await tester.ensureVisible(upTo);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Arrivato qui').at(1)); // Legends Never Die: anche Warriors prima
+    await tester.tap(upTo); // also Warriors, before it
     await tester.pumpAndSettle();
     expect(fatte(app).keys.toSet(), {'single|warriors', 'single|legends never die'});
-    await tester.ensureVisible(find.text('annulla').first);
+    // The «annulla» of the row of Warriors
+    final warriorsRow = find.ancestor(
+      of: find.text('Warriors'),
+      matching: find.byWidgetPredicate((w) => w is Container && w.decoration is BoxDecoration
+          && (w.decoration as BoxDecoration).border != null),
+    );
+    await tester.scrollUntilVisible(find.text('Warriors'), -300, scrollable: find.byType(Scrollable).first);
+    final undo = find.descendant(of: warriorsRow.first, matching: find.text('annulla'));
+    await tester.ensureVisible(undo);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('annulla').first);
+    await tester.tap(undo);
     await tester.pumpAndSettle();
     expect(fatte(app).keys, ['single|legends never die']);
   });

@@ -53,6 +53,9 @@ class SavedArtist {
   /// The bookmark of Recuperando (web/segnalibro.js writes the same map).
   Fatte get fatte => fatteFromJson(data['fatte']);
 
+  /// The songs ticked one by one (free order).
+  Canzoni get canzoni => canzoniFromJson(data['canzoni']);
+
   /// The kinds this artist's catch-up includes (compilations are out by default).
   List<String> get tipiRecupero => _kinds(data['tipi_recupero']) ?? defaultKinds;
 

@@ -50,17 +50,24 @@ class Release {
 
   /// The copy saved on the phone (the same fields as the web app's copy).
   factory Release.fromJson(Map<String, dynamic> j) => Release(
-        id: '${j['id']}',
-        title: '${j['title'] ?? ''}',
-        type: '${j['type'] ?? 'album'}',
-        date: '${j['date'] ?? ''}',
-        cover: '${j['cover'] ?? ''}',
-        link: '${j['link'] ?? ''}',
-        explicit: j['explicit'] == true,
-      );
+    id: '${j['id']}',
+    title: '${j['title'] ?? ''}',
+    type: '${j['type'] ?? 'album'}',
+    date: '${j['date'] ?? ''}',
+    cover: '${j['cover'] ?? ''}',
+    link: '${j['link'] ?? ''}',
+    explicit: j['explicit'] == true,
+  );
 
-  Map<String, dynamic> toJson() =>
-      {'id': id, 'title': title, 'type': type, 'date': date, 'cover': cover, 'link': link, 'explicit': explicit};
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'type': type,
+    'date': date,
+    'cover': cover,
+    'link': link,
+    'explicit': explicit,
+  };
 
   final String id;
   final String title;
@@ -152,7 +159,10 @@ List<ReleaseGroup> groupReleases(List<Release> releases, String artistName) {
           key: entry.key,
           kind: kindOf(main, artistName),
           main: main,
-          versions: [for (final r in byDate) if (!identical(r, main)) r],
+          versions: [
+            for (final r in byDate)
+              if (!identical(r, main)) r,
+          ],
         );
       }(),
   ];
@@ -190,3 +200,60 @@ String dateLabel(String iso) {
 /// without its API).
 String spotifySearchUrl(String artist, String title) =>
     'https://open.spotify.com/search/${Uri.encodeComponent('$artist $title'.trim())}';
+
+/// One song of a release (album/{id}/tracks).
+class Track {
+  const Track({
+    required this.id,
+    required this.title,
+    this.position = 0,
+    this.disk = 1,
+    this.duration = 0,
+    this.explicit = false,
+  });
+
+  factory Track.fromApi(Map<String, dynamic> hit) => Track(
+    id: '${hit['id']}',
+    title: (hit['title'] as String?) ?? '',
+    position: (hit['track_position'] as num?)?.toInt() ?? 0,
+    disk: (hit['disk_number'] as num?)?.toInt() ?? 1,
+    duration: (hit['duration'] as num?)?.toInt() ?? 0,
+    explicit: hit['explicit_lyrics'] == true,
+  );
+
+  final String id;
+  final String title;
+  final int position;
+  final int disk;
+  final int duration; // seconds
+  final bool explicit;
+}
+
+/// The key of each song in the ticks of the free order: its title without accents and
+/// punctuation (the same in every version of the release); a repeated title gets "#2", "#3".
+List<String> trackKeys(List<Track> tracks) {
+  final seen = <String, int>{};
+  return [
+    for (final t in tracks)
+      () {
+        final base = normalize(t.title);
+        final n = (seen[base] ?? 0) + 1;
+        seen[base] = n;
+        return n == 1 ? base : '$base#$n';
+      }(),
+  ];
+}
+
+/// 225 -> "3:45"; 3725 -> "1:02:05".
+String durationLabel(int seconds) {
+  final h = seconds ~/ 3600, m = (seconds % 3600) ~/ 60, s = seconds % 60;
+  String two(int n) => n.toString().padLeft(2, '0');
+  return h > 0 ? '$h:${two(m)}:${two(s)}' : '$m:${two(s)}';
+}
+
+/// The length of a whole release: "42 min", "1 h 05 min".
+String totalLabel(int seconds) {
+  final minutes = (seconds / 60).round();
+  if (minutes < 60) return '$minutes min';
+  return '${minutes ~/ 60} h ${(minutes % 60).toString().padLeft(2, '0')} min';
+}

@@ -76,6 +76,8 @@ class FakeDeezer implements DeezerApi {
   ];
   final profiles = <String, List<DeezerArtist>>{};
   final discographies = <String, List<Release>>{};
+  final trackLists = <String, List<Track>>{}; // release id -> songs
+  final similar = <String, List<DeezerArtist>>{};
   final searches = <String>[];
   final discographyCalls = <String>[];
   bool down = false;
@@ -101,6 +103,12 @@ class FakeDeezer implements DeezerApi {
 
   @override
   Future<String> resolveLink(String link) async => 'https://www.deezer.com/it/profile/2529?utm=share';
+
+  @override
+  Future<List<Track>> tracks(String releaseId) async => trackLists[releaseId] ?? const [];
+
+  @override
+  Future<List<DeezerArtist>> related(String artistId) async => similar[artistId] ?? const [];
 
   @override
   Future<List<Release>> discography(String artistId) async {

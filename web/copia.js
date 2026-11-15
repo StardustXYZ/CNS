@@ -1,5 +1,5 @@
 // Backup of one person's CNS data as a JSON file (as in CNV's "copia di sicurezza").
-// The file holds the artists (lists, notes, bookmark, alert kinds), the ntfy topic, the
+// The file holds the artists (lists, notes, bookmark, songs ticked, alert kinds), the ntfy topic, the
 // Novità and the announced releases. Restoring brings back the artists and the topic; the
 // Novità and "In arrivo" are written only by GitHub, so they stay in the file as a record.
 // Pure functions (tested in web/test/copia.test.mjs), no network.
@@ -7,7 +7,8 @@
 export const FORMAT = "cns-copia";
 export const VERSION = 1;
 const LISTS = ["controllare", "recuperando", "archivio"];
-const ARTIST_FIELDS = ["nome", "foto", "link", "fan", "lista", "nota", "fatte", "tipi_recupero", "tipi_avviso", "auto_sposta", "fine_tenuta"];
+// "canzoni": the songs ticked one by one in the Android app (free order of Recuperando)
+const ARTIST_FIELDS = ["nome", "foto", "link", "fan", "lista", "nota", "fatte", "canzoni", "tipi_recupero", "tipi_avviso", "auto_sposta", "fine_tenuta"];
 
 /** Firestore's dates (Timestamp) as ISO text, everything else as it is. */
 function plain(value) {

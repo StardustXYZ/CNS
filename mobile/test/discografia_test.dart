@@ -187,4 +187,41 @@ void main() {
       });
     });
   });
+
+  group("l'ordine libero: una spunta per canzone", () {
+    test('chiavi, durate e durata totale', () {
+      final tracks = [
+        const Track(id: '1', title: 'Intro', duration: 59),
+        const Track(id: '2', title: 'Enemy (feat. JID)', duration: 225),
+        const Track(id: '3', title: 'Intro', duration: 3725),
+      ];
+      expect(trackKeys(tracks), ['intro', 'enemy feat jid', 'intro#2']);
+      expect(durationLabel(225), '3:45');
+      expect(durationLabel(3725), '1:02:05');
+      expect(totalLabel(2520), '42 min');
+      expect(totalLabel(3900), '1 h 05 min');
+      final t = Track.fromApi({'id': 9, 'title': 'X', 'track_position': 4, 'disk_number': 2, 'duration': 61});
+      expect((t.position, t.disk, t.duration), (4, 2, 61));
+    });
+
+    test("l'ultima canzone spuntata segna l'uscita come ascoltata; togliendone una il segno sparisce", () {
+      const songs = ['a', 'b'];
+      var (canzoni, fatte) = toggleSong({}, {}, 'album|x', 'a', songs, 1);
+      expect(canzoni, {'album|x': {'a': 1}});
+      expect(fatte, isEmpty);
+      (canzoni, fatte) = toggleSong(canzoni, fatte, 'album|x', 'b', songs, 2);
+      expect(fatte['album|x']!.state, listened);
+      (canzoni, fatte) = toggleSong(canzoni, fatte, 'album|x', 'a', songs, 3);
+      expect(canzoni, {'album|x': {'b': 2}});
+      expect(fatte, isEmpty);
+      (canzoni, fatte) = toggleSong(canzoni, fatte, 'album|x', 'b', songs, 4);
+      expect(canzoni, isEmpty); // nessuna spunta: l'uscita sparisce dalla mappa
+      expect(canzoniToJson(canzoniFromJson({'album|y': {'s': 5, 'rotto': 'x'}, 'z': 3})), {'album|y': {'s': 5}});
+    });
+
+    test('una saltata resta saltata anche spuntando una canzone', () {
+      final (_, fatte) = toggleSong({}, {'album|x': const Mark(skipped, 1)}, 'album|x', 'a', ['a', 'b'], 2);
+      expect(fatte['album|x']!.state, skipped);
+    });
+  });
 }

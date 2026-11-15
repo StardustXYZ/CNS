@@ -246,16 +246,16 @@ Come CNV: un'app Android vera accanto all'app web, che legge e scrive **gli stes
     - da un **elenco di nomi incollato**, uno per riga: ogni nome viene cercato su Deezer, con una pausa tra le ricerche, usando la stessa regola "nome uguale con più fan".
 
     Prima di salvare, una schermata mostra cosa è stato trovato. Lì puoi togliere gli artisti sbagliati e scegliere se metterli in Controllare o in Recuperando. Chi è già in una lista viene saltato. Se il profilo è privato, l'app lo dice chiaramente.
-- [ ] **8.4 Pagina dell'artista** — prima parte fatta il 15/11/2026 (provata sul telefono; mancano le funzioni *Nuovo* qui sotto): lista, nota, avvisi, discografia con i doppioni uniti e la copia sul telefono, segnalibro (Ascoltato, Salta, Annulla, Arrivato qui, fine discografia), pulsanti Spotify e Deezer.
-  - [ ] *Nuovo* – **Lista delle canzoni** di ogni uscita: toccandola si apre l'elenco dei brani, con numero, titolo e durata, la durata totale e i dischi separati se sono più di uno.
-  - [ ] *Nuovo* – **Ordine libero**: non serve più seguire l'ordine della discografia.
+- [x] **8.4 Pagina dell'artista** — fatta il 15/11/2026, in due parti (provate sul telefono): lista, nota, avvisi, discografia con i doppioni uniti e la copia sul telefono, segnalibro (Ascoltato, Salta, Annulla, Arrivato qui, fine discografia), pulsanti Spotify e Deezer.
+  - [x] *Nuovo* – **Lista delle canzoni** di ogni uscita: toccandola si apre l'elenco dei brani, con numero, titolo e durata, la durata totale e i dischi separati se sono più di uno.
+  - [x] *Nuovo* – **Ordine libero**: non serve più seguire l'ordine della discografia.
     - Ogni uscita ha il suo "✓ Ascoltato", accanto ad "Arrivato qui".
     - Nella lista delle canzoni si può spuntare **una canzone alla volta**, a caso.
     - L'uscita conta come ascoltata quando sono spuntate tutte le sue canzoni, oppure quando la segni tu.
     - Le canzoni spuntate si salvano nel documento dell'artista, in un campo nuovo accanto a `fatte`. Le regole di Firestore non vanno cambiate.
     - Anche l'app web deve leggere questo campo, per non perdere le spunte.
-  - [ ] *Nuovo* – **"Ti potrebbero piacere"**: nella pagina dell'artista, una riga con gli artisti simili dati da Deezer, ognuno con il pulsante + per aggiungerlo. Chi è già in una lista non compare.
-  - [ ] *Nuovo* – **"Cosa ascolto adesso?"**: un pulsante in Recuperando che sceglie a caso un'uscita non ancora fatta tra tutti gli artisti in Recuperando. Mostra copertina, artista e titolo, con i pulsanti "Ascoltato", "Un'altra" e "Apri su Spotify". Si possono escludere i singoli, se vuoi solo album.
+  - [x] *Nuovo* – **"Ti potrebbero piacere"**: nella pagina dell'artista, una riga con gli artisti simili dati da Deezer, ognuno con il pulsante + per aggiungerlo. Chi è già in una lista non compare.
+  - [x] *Nuovo* – **"Cosa ascolto adesso?"**: un pulsante in Recuperando che sceglie a caso un'uscita non ancora fatta tra tutti gli artisti in Recuperando. Mostra copertina, artista e titolo, con i pulsanti "Ascoltato", "Un'altra" e "Apri su Spotify". Si possono escludere i singoli, se vuoi solo album.
 - [ ] **8.5 Novità e In arrivo**, con Spotify, Deezer e Apple Music, e il contatore delle nuove.
   - [ ] *Nuovo* – **Widget Android** per la schermata principale, in due versioni:
     - "Ultime uscite", con le ultime 3 Novità;

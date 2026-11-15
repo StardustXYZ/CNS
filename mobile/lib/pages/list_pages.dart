@@ -7,6 +7,7 @@ import '../data/segnalibro.dart' show queueOf;
 import '../theme.dart';
 import 'artist_page.dart';
 import 'import_page.dart';
+import 'random_pick.dart';
 import 'search_page.dart';
 import 'widgets.dart';
 
@@ -106,6 +107,12 @@ class ArtistListPage extends StatelessWidget {
               icon: const Icon(Icons.playlist_add),
               label: const Text('Importa'),
             ),
+            if (lista == Lists.recuperando && list.isNotEmpty)
+              FilledButton.tonalIcon(
+                onPressed: () => showRandomPick(context),
+                icon: const Icon(Icons.shuffle),
+                label: const Text('Cosa ascolto adesso?'),
+              ),
           ],
         ),
         const SizedBox(height: 12),

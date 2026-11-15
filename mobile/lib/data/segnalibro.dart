@@ -101,3 +101,54 @@ Fatte fatteFromJson(Object? value) {
   });
   return out;
 }
+
+// ------------------------------------------------------------------ free order: one tick per song
+
+/// The songs ticked in each release, saved in the artist's document as "canzoni":
+/// `{ <release key>: { <song key>: time } }`. When every song of a release is ticked, the
+/// release is also marked as listened in "fatte", so the web app counts it too.
+typedef Canzoni = Map<String, Map<String, int>>;
+
+Canzoni canzoniFromJson(Object? value) {
+  if (value is! Map) return {};
+  final out = <String, Map<String, int>>{};
+  value.forEach((release, songs) {
+    if (release is! String || songs is! Map) return;
+    final ticks = <String, int>{};
+    songs.forEach((song, t) {
+      if (song is String && t is num) ticks[song] = t.toInt();
+    });
+    if (ticks.isNotEmpty) out[release] = ticks;
+  });
+  return out;
+}
+
+Map<String, dynamic> canzoniToJson(Canzoni canzoni) => {for (final e in canzoni.entries) e.key: {...e.value}};
+
+/// Ticks or unticks one song. Ticking the last one marks the release as listened; unticking a
+/// song of a release listened to takes the mark away (the release is no longer complete).
+(Canzoni, Fatte) toggleSong(
+  Canzoni canzoni,
+  Fatte fatte,
+  String releaseKey,
+  String songKey,
+  List<String> allSongs,
+  int now,
+) {
+  final ticks = {...?canzoni[releaseKey]};
+  final nextFatte = {...fatte};
+  if (ticks.containsKey(songKey)) {
+    ticks.remove(songKey);
+    if (nextFatte[releaseKey]?.state == listened) nextFatte.remove(releaseKey);
+  } else {
+    ticks[songKey] = now;
+    if (allSongs.isNotEmpty && allSongs.every(ticks.containsKey)) nextFatte[releaseKey] = Mark(listened, now);
+  }
+  final next = {...canzoni};
+  if (ticks.isEmpty) {
+    next.remove(releaseKey);
+  } else {
+    next[releaseKey] = ticks;
+  }
+  return (next, nextFatte);
+}

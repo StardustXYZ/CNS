@@ -159,6 +159,23 @@ class DiscographyStore extends ChangeNotifier {
     }
   }
 
+  final _tracks = <String, Future<List<Track>>>{};
+  final _related = <String, Future<List<DeezerArtist>>>{};
+
+  /// The songs of a release, asked to Deezer once while the app is open (a failure is retried).
+  Future<List<Track>> tracks(String releaseId) =>
+      _tracks[releaseId] ??= _deezer.tracks(releaseId).catchError((Object err) {
+        _tracks.remove(releaseId);
+        throw err;
+      });
+
+  /// The similar artists, asked to Deezer once while the app is open.
+  Future<List<DeezerArtist>> related(String artistId) =>
+      _related[artistId] ??= _deezer.related(artistId).catchError((Object err) {
+        _related.remove(artistId);
+        throw err;
+      });
+
   void _changed() {
     if (!_disposed) notifyListeners();
   }

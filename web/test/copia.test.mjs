@@ -9,7 +9,8 @@ const timestamp = (iso) => ({ toDate: () => new Date(iso) }); // like Firestore'
 const AVA = { id: "12948083", nome: "Ava Max", lista: "controllare", nota: "", foto: "https://cdn/ava.jpg", fan: 1235611,
     tipi_avviso: ["album", "single"], aggiunto: timestamp("2026-11-12T19:00:00Z") };
 const LOL = { id: "7402526", nome: "League of Legends", lista: "recuperando", nota: "",
-    fatte: { "single|take over": { s: "a", t: 1763000000000 } }, tipi_recupero: ["album", "single"], auto_sposta: true };
+    fatte: { "single|take over": { s: "a", t: 1763000000000 } }, tipi_recupero: ["album", "single"], auto_sposta: true,
+    canzoni: { "album|arcane league of legends": { "enemy": 1763000000001, "playground": 1763000000002 } } };
 
 test("la copia contiene artisti, argomento ntfy e storico, con le date in testo", () => {
     const backup = buildBackup({ artists: [AVA, LOL], settings: { ntfy: "cns-abc", email: "x@example.com" },
@@ -36,6 +37,7 @@ test("il ripristino riprende artisti, segnalibro e argomento", () => {
     assert.equal(restored.skipped, 0);
     const lol = restored.artists.find((a) => a.id === "7402526");
     assert.deepEqual(lol.fatte, LOL.fatte);
+    assert.deepEqual(lol.canzoni, LOL.canzoni); // the songs ticked in the Android app come back too
     assert.equal(lol.auto_sposta, true);
     assert.equal(restored.artists[0].aggiunto, undefined); // not restored: Firebase sets its own
 });
