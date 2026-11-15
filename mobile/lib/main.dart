@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'data/account.dart';
 import 'data/artists.dart';
@@ -15,9 +18,11 @@ import 'data/firebase_push.dart';
 import 'data/home_widget_sync.dart';
 import 'data/news.dart';
 import 'data/notifications.dart';
+import 'data/updates.dart';
 import 'home.dart';
 import 'pages/account_pages.dart';
-import 'pages/impostazioni_page.dart' show BackupScope, NotificationScope;
+import 'pages/app_info.dart' show UpdateScope;
+import 'pages/impostazioni_page.dart' show BackupScope, NotificationScope, appVersion;
 import 'pages/list_pages.dart';
 import 'pages/novita_page.dart';
 import 'pages/widgets.dart';
@@ -49,6 +54,14 @@ Future<void> main() async {
   final discographies = DiscographyStore(deezer, FileDiscoCache());
   final backup = BackupService(account, artists, news, backupBackend, PickerFiles());
   final notifications = push != null && phones != null ? NotificationStore(account, phones, push) : null;
+  // The version of this APK: shown in Impostazioni and compared with the releases on GitHub
+  UpdateStore? updates;
+  try {
+    appVersion = (await PackageInfo.fromPlatform()).version;
+    updates = UpdateStore(currentVersion: appVersion);
+  } catch (err) {
+    debugPrint('Versione non letta: $err');
+  }
   runApp(
     CnsApp(
       account: account,
@@ -58,8 +71,11 @@ Future<void> main() async {
       news: news,
       backup: backup,
       notifications: notifications,
+      updates: updates,
     ),
   );
+  // A few seconds after opening, without slowing the start
+  if (updates != null) Timer(const Duration(seconds: 3), updates.check);
   // Notifications: with the app open a message at the bottom; a tap opens Novità
   if (push != null) {
     push.foreground().listen(
@@ -100,6 +116,7 @@ class CnsApp extends StatelessWidget {
     required this.news,
     required this.backup,
     this.notifications,
+    this.updates,
   });
 
   // With fakes in the tests
@@ -110,6 +127,7 @@ class CnsApp extends StatelessWidget {
   final NewsStore news;
   final BackupService backup;
   final NotificationStore? notifications; // null without Firebase
+  final UpdateStore? updates; // null in the tests
 
   @override
   Widget build(BuildContext context) {
@@ -128,16 +146,19 @@ class CnsApp extends StatelessWidget {
                 service: backup,
                 child: NotificationScope(
                   store: notifications,
-                  child: MaterialApp(
-                    title: 'CNS',
-                    debugShowCheckedModeBanner: false,
-                    scaffoldMessengerKey: messengerKey,
-                    theme: cnsTheme(),
-                    // Flutter's own texts (dates, "Annulla", "Incolla"…) in Italian
-                    locale: const Locale('it'),
-                    supportedLocales: const [Locale('it')],
-                    localizationsDelegates: GlobalMaterialLocalizations.delegates,
-                    home: const AccessGate(child: HomeShell()),
+                  child: UpdateScope(
+                    store: updates,
+                    child: MaterialApp(
+                      title: 'CNS',
+                      debugShowCheckedModeBanner: false,
+                      scaffoldMessengerKey: messengerKey,
+                      theme: cnsTheme(),
+                      // Flutter's own texts (dates, "Annulla", "Incolla"…) in Italian
+                      locale: const Locale('it'),
+                      supportedLocales: const [Locale('it')],
+                      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+                      home: const AccessGate(child: HomeShell()),
+                    ),
                   ),
                 ),
               ),

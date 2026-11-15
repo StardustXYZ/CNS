@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../data/account.dart' show AccountStore;
 import '../data/backup.dart';
 import '../data/copia.dart' show BackupError, ParsedBackup;
 import '../data/notifications.dart';
 import '../theme.dart';
 import 'account_pages.dart';
+import 'app_info.dart';
 
 /// Gives the pages the notifications of this phone (null without Firebase, as in some tests).
 class NotificationScope extends InheritedNotifier<NotificationStore> {
@@ -29,6 +31,9 @@ class BackupScope extends InheritedWidget {
 
 /// Impostazioni: the account (with the allow list for the administrator), the notifications on
 /// this phone and the backup copy.
+/// The version of the app shown in Impostazioni (read at start from the APK; "" in the tests).
+String appVersion = '';
+
 class ImpostazioniPage extends StatelessWidget {
   const ImpostazioniPage({super.key});
 
@@ -36,7 +41,12 @@ class ImpostazioniPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: const [AccountCard(), NotificationsCard(), BackupCard()],
+      children: [
+        const AccountCard(),
+        const NotificationsCard(),
+        const BackupCard(),
+        AppInfoCard(version: appVersion),
+      ],
     );
   }
 }
@@ -114,6 +124,15 @@ class AccountCard extends StatelessWidget {
               onPressed: account.busy ? null : () => confirmSignOut(context, account),
               icon: const Icon(Icons.logout, size: 18),
               label: const Text('Esci dall’account'),
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: CnsColors.red),
+              onPressed: account.busy ? null : () => confirmDeleteAccount(context, account),
+              icon: const Icon(Icons.delete_forever, size: 18),
+              label: const Text('Elimina l’account'),
             ),
           ),
         ],
@@ -283,5 +302,33 @@ class NotificationsCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// "Elimina l'account", after asking: the data in Firebase and the account go away for good.
+Future<void> confirmDeleteAccount(BuildContext context, AccountStore account) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (dialog) => AlertDialog(
+      title: const Text('Eliminare l’account?'),
+      content: const Text(
+        'Cancello da Firebase i tuoi artisti con note e segnalibri, le Novità, le uscite in '
+        'arrivo, i telefoni registrati per le notifiche e l’account stesso, anche per l’app web. '
+        'Non si può annullare: prima, se vuoi, salva la copia di sicurezza.',
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(dialog).pop(false), child: const Text('Annulla')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: CnsColors.red),
+          onPressed: () => Navigator.of(dialog).pop(true),
+          child: const Text('Elimina'),
+        ),
+      ],
+    ),
+  );
+  if (ok != true || !context.mounted) return;
+  final messenger = ScaffoldMessenger.of(context);
+  if (await attempt(context, account.deleteAccount)) {
+    messenger.showSnackBar(const SnackBar(content: Text('Account eliminato.')));
   }
 }

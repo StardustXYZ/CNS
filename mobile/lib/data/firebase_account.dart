@@ -122,6 +122,41 @@ class FirebaseAccountBackend implements AccountBackend {
     if (snap.data()?['email'] != email) await doc.set({'email': email}, SetOptions(merge: true));
   }
 
+  @override
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    final uid = user.uid;
+    try {
+      // The data first, while the rules still let this account in (a batch takes up to 500)
+      for (final name in const ['artisti', 'novita', 'anteprime', 'telefoni']) {
+        final docs = (await _db.collection('utenti/$uid/$name').get()).docs;
+        for (var start = 0; start < docs.length; start += 400) {
+          final batch = _db.batch();
+          for (final d in docs.skip(start).take(400)) {
+            batch.delete(d.reference);
+          }
+          await batch.commit();
+        }
+      }
+      await _db.doc('utenti/$uid').delete();
+    } on FirebaseException catch (err) {
+      if (err.code != 'permission-denied') {
+        throw AccountError('Dati non cancellati (${err.code}). Controlla la connessione e riprova.');
+      }
+    }
+    try {
+      await user.delete();
+    } on FirebaseAuthException catch (err) {
+      if (err.code == 'requires-recent-login') {
+        throw const AccountError('I dati sono cancellati; per eliminare anche l’account, per sicurezza esci, '
+            'rientra e tocca subito di nuovo «Elimina l’account».');
+      }
+      throw AccountError(_authMessage(err));
+    }
+    if (_googleReady) await GoogleSignIn.instance.signOut();
+  }
+
   static Future<void> _guard(Future<void> Function() action) async {
     try {
       await action();

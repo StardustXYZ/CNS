@@ -1,0 +1,7 @@
+# Copy this file as key.properties and fill in the two passwords chosen when the key was
+# created (NOME: your Windows user). key.properties stays on the PC, next to the key in
+# Desktop\cns-chiavi, and is copied into mobile/android/ only to build: it is in .gitignore.
+storeFile=C:/Users/NOME/OneDrive/Desktop/cns-chiavi/cns-firma.jks
+keyAlias=cns
+storePassword=
+keyPassword=

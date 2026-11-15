@@ -48,6 +48,10 @@ abstract class AccountBackend {
   /// Saves the e-mail in the account's settings, as the web app does: the check on GitHub
   /// uses it to skip people taken off the list.
   Future<void> rememberEmail(String uid, String email);
+
+  /// Deletes the account's data in Firestore (artists, Novità, In arrivo, phones, settings)
+  /// and then the account itself.
+  Future<void> deleteAccount();
 }
 
 /// The account part of the app: who is signed in and whether it is admitted.
@@ -140,6 +144,9 @@ class AccountStore extends ChangeNotifier {
         }
         await b.signOut();
       });
+
+  /// "Elimina l'account": its data in Firebase and the account. Not undoable.
+  Future<void> deleteAccount() => _run((b) => b.deleteAccount());
 
   /// "Ho confermato": reads the account again; if the e-mail is now confirmed, checks the list.
   Future<bool> reloadVerified() async {

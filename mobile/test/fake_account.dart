@@ -74,6 +74,14 @@ class FakeBackend implements AccountBackend {
 
   @override
   Future<void> rememberEmail(String uid, String email) async => remembered[uid] = email;
+
+  final deleted = <String>[];
+
+  @override
+  Future<void> deleteAccount() async {
+    deleted.add(_current!.uid);
+    _set(null);
+  }
 }
 
 Future<void> settle() => Future<void>.delayed(Duration.zero);

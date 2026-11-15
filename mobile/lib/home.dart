@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'data/artists.dart';
+import 'pages/app_info.dart' show UpdateBanner;
 import 'pages/artist_page.dart';
 import 'pages/impostazioni_page.dart';
 import 'pages/list_pages.dart';
@@ -118,14 +119,21 @@ class HomeShellState extends State<HomeShell> {
     }
     return Scaffold(
       appBar: AppBar(title: const CnsTitle()),
-      body: PageView(
-        controller: _pager,
-        onPageChanged: (index) => setState(() => _current = index),
+      body: Column(
         children: [
-          const ArtistListPage(lista: Lists.controllare),
-          const ArtistListPage(lista: Lists.recuperando),
-          const NovitaPage(),
-          const ImpostazioniPage(),
+          const UpdateBanner(),
+          Expanded(
+            child: PageView(
+              controller: _pager,
+              onPageChanged: (index) => setState(() => _current = index),
+              children: [
+                const ArtistListPage(lista: Lists.controllare),
+                const ArtistListPage(lista: Lists.recuperando),
+                const NovitaPage(),
+                const ImpostazioniPage(),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(

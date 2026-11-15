@@ -3,7 +3,7 @@ description: "CNS - Chi Ni Sentimu: le uscite degli artisti che segui"
 publish_to: 'none' # private app, never published on pub.dev
 
 # versionName+versionCode on Android: raise both for every APK given to friends
-version: 0.8.1+9
+version: 1.0.0+10
 
 environment:
   sdk: ^3.9.2
@@ -21,6 +21,7 @@ dependencies:
   google_sign_in: ^7.2.0
   home_widget: 0.9.2
   http: ^1.6.0
+  package_info_plus: 9.0.1
   path_provider: ^2.1.5
   url_launcher: ^6.3.2
 
