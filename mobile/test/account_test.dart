@@ -1,9 +1,9 @@
 import 'package:cns/data/account.dart';
-import 'package:cns/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_account.dart';
+import 'fakes.dart';
 
 void main() {
   group("l'account", () {
@@ -100,9 +100,9 @@ void main() {
       tester.view.physicalSize = const Size(375 * 3, 812 * 3);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
-      final backend = FakeBackend();
-      await tester.pumpWidget(CnsApp(account: AccountStore(backend)));
-      return backend;
+      final app = TestApp();
+      await tester.pumpWidget(app.widget);
+      return app.accountBackend;
     }
 
     testWidgets('senza account: i due modi di accesso, e niente menu', (tester) async {

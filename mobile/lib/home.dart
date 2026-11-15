@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'data/artists.dart';
 import 'pages/impostazioni_page.dart';
+import 'pages/list_pages.dart';
 import 'pages/page_placeholder.dart';
 import 'theme.dart';
 
@@ -67,13 +69,18 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final artists = ArtistsScope.of(context);
+    // How many artists in each list, on the menu (as the counters of the web menu)
+    final counts = [artists.count(Lists.controllare), artists.count(Lists.recuperando), 0, 0];
     return Scaffold(
       appBar: AppBar(title: const CnsTitle()),
       body: PageView(
         controller: _pager,
         onPageChanged: (index) => setState(() => _current = index),
         children: [
-          for (final page in cnsPages.take(3)) PagePlaceholder(page: page),
+          const ArtistListPage(lista: Lists.controllare),
+          const ArtistListPage(lista: Lists.recuperando),
+          PagePlaceholder(page: cnsPages[2]),
           const ImpostazioniPage(),
         ],
       ),
@@ -81,8 +88,13 @@ class _HomeShellState extends State<HomeShell> {
         selectedIndex: _current,
         onDestinationSelected: _goTo,
         destinations: [
-          for (final page in cnsPages)
-            NavigationDestination(icon: Icon(page.icon), selectedIcon: Icon(page.selectedIcon), label: page.label),
+          for (final (i, page) in cnsPages.indexed)
+            NavigationDestination(
+              icon: Badge(isLabelVisible: counts[i] > 0, label: Text('${counts[i]}'), child: Icon(page.icon)),
+              selectedIcon:
+                  Badge(isLabelVisible: counts[i] > 0, label: Text('${counts[i]}'), child: Icon(page.selectedIcon)),
+              label: page.label,
+            ),
         ],
       ),
     );

@@ -1,10 +1,8 @@
-import 'package:cns/data/account.dart';
 import 'package:cns/home.dart';
-import 'package:cns/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'fake_account.dart';
+import 'fakes.dart';
 
 void main() {
   // A narrow phone, as the 375 px of the web tests, signed in as the administrator
@@ -12,7 +10,7 @@ void main() {
     tester.view.physicalSize = const Size(375 * 3, 812 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(CnsApp(account: AccountStore(FakeBackend())));
+    await tester.pumpWidget(TestApp().widget);
     await tester.tap(find.text('Accedi con Google')); // the pages need an admitted account
     await tester.pumpAndSettle();
   }

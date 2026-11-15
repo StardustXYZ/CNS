@@ -240,8 +240,8 @@ Come CNV: un'app Android vera accanto all'app web, che legge e scrive **gli stes
 - [x] **8.0 Preparazione** — fatta il 15/11/2026: app Android registrata, `google-services.json` in `Desktop\cns-chiavi`, Email/password attivato (da provare nella 8.2). Nella 8.1 aggiungere a `.gitignore`: `google-services.json`, `key.properties`, `*.jks`, `*.keystore`. Programma originale (la fai tu, con la mia guida): app Android `it.stardustxyz.cns` nel progetto Firebase di CNS, impronta SHA-1 della chiave di debug, accesso con email e password attivato in Authentication, `google-services.json` in `Desktop\cns-chiavi` (mai in git). Facoltativo ma utile: ruolo "Firebase Rules Admin" all'account di servizio, così le regole nuove si pubblicano da GitHub invece che a mano.
 - [x] **8.1 Scheletro** — fatta il 15/11/2026 (Nineteenth Commit, provata sul telefono): progetto `mobile/`, tema verde e nero (#008000 e #33A833 come il web), menu in basso con scorrimento tra le pagine, icona con le cuffie (classica, adattiva, a tema, bianca per le notifiche), schermata di avvio scura, testi di Flutter in italiano.
 - [x] **8.2 Accesso e ammessi** — fatta il 15/11/2026 (provata sul telefono, anche con Google): Google + email e password con conferma dell'email, stessa lista `config/ammessi` dell'app web, pagina Ammessi per l'amministratore, uscita con conferma, messaggio per chi non è ammesso.
-- [ ] **8.3 Liste e ricerca**: Controllare e Recuperando da Firestore, ricerca su Deezer (nome o link), aggiunta, contatori.
-  - [ ] *Nuovo* – **Importare artisti** in un colpo solo, in due modi:
+- [x] **8.3 Liste e ricerca** — fatta il 15/11/2026 (provata sul telefono): Controllare e Recuperando da Firestore, ricerca su Deezer (nome o link), aggiunta, contatori.
+  - [x] *Nuovo* – **Importare artisti** in un colpo solo, in due modi:
     - dal link di un **profilo Deezer pubblico**, con gli artisti preferiti di quel profilo;
     - da un **elenco di nomi incollato**, uno per riga: ogni nome viene cercato su Deezer, con una pausa tra le ricerche, usando la stessa regola "nome uguale con più fan".
 
