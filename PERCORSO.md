@@ -219,9 +219,72 @@ Scelti il 13/11/2026: punti 1, 2 e la pulizia; Telegram per ora no.
 - [x] Copia di sicurezza ed esportazione in JSON (Impostazioni → "Copia di sicurezza", `web/copia.js`): artisti con note, segnalibri e avvisi, argomento ntfy, storico delle Novità e uscite in arrivo. "Ripristina" riporta artisti e argomento (gli artisti con lo stesso codice vengono sostituiti, gli altri restano); Novità e In arrivo restano nel file come promemoria, perché le scrive solo GitHub. Provata sull'emulatore: artista tolto e ripristinato con il segnalibro, file sbagliato rifiutato.
 - [x] Layout per il PC (da 900 px in su): liste di artisti a griglia (2 colonne, 3 da 1280 px), Novità e discografia su più colonne, pagina dell'artista con l'artista a sinistra e la discografia a destra, Impostazioni su due colonne; frecce ← → della tastiera per cambiare pagina (non mentre si scrive). Sul telefono non cambia niente. Provato a 1280 e a 375 px.
 - [ ] Telegram come seconda notifica (facoltativo, per ora no).
-- [ ] Pulizia delle cartelle di lavoro e dei branch già uniti.
+- [x] Pulizia delle cartelle di lavoro e dei branch già uniti: 13 cartelle e 13 branch tolti dal PC e da GitHub il 13/11/2026, dopo aver controllato che fossero tutti già in `main`.
 
-### Fase 8 – Lettore MP3 (progetto a parte, più avanti)
+### Fase 8 – App Android in Flutter (programma del 15/11/2026)
+Come CNV: un'app Android vera accanto all'app web, che legge e scrive **gli stessi documenti** di Firebase (`utenti/{codice}/…`), così le due funzionano insieme durante la prova. Il controllo su GitHub, Deezer, iTunes e il progetto Firebase `cns-chi-ni-sindimu` restano come sono.
+
+**Controlli fatti prima di scrivere il programma (15/11/2026):**
+- Letta l'app Flutter di CNV (`CNVTrue/mobile`, solo in lettura): store `ChangeNotifier` + `InheritedNotifier`, servizi dietro interfacce per i test, account Google + email con conferma, lista degli ammessi, notifiche FCM con i telefoni in `utenti/{uid}/telefoni`, avviso di aggiornamento da GitHub Releases (`app-vX.Y.Z`), firma da `key.properties`, icone da `tools/crea_icone.py`. Lette anche le regole e l'invio FCM di CNV (`app/push.py`, con `firebase-admin`).
+- **Deezer dall'app**: risponde normalmente a un client "Dart" come quello di Flutter (discografia a pagine, ricerca, 12 richieste di fila senza blocchi). In Flutter niente JSONP: chiamate HTTP dirette.
+- **Strumenti sul PC**: Flutter 3.35.7 / Dart 3.9.2 (come CNV), Java 21, Android SDK con build-tools 36.1, chiave di debug presente.
+- **Controllo ogni 3 ore**: parte da solo (5 giri programmati, tutti riusciti), ma GitHub ne salta molti (5 in un giorno e mezzo invece di circa 12). Da sistemare a parte (vedi sotto).
+
+**Differenze da CNV di cui tenere conto:**
+- In CNS il controllo parla con Firebase via REST (senza `firebase-admin`): l'invio FCM si farebbe con l'API HTTP v1 di FCM e la stessa chiave dell'account di servizio, senza librerie nuove.
+- Le regole di CNS hanno più raccolte (`artisti`, `novita`, `anteprime`): per le notifiche native vanno aggiunte `telefoni` e la scelta delle notifiche nelle impostazioni.
+- Discografia, doppioni e segnalibro vanno riscritti in Dart: si provano con **gli stessi esempi** di `tests/fixtures/doppioni.json`, già condivisi da Python e JavaScript, così le tre versioni restano uguali.
+- La copia di sicurezza dell'app deve usare lo stesso formato `cns-copia` versione 1 dell'app web.
+
+**Fasi proposte** (un branch e una cartella di lavoro per fase, unione con `git merge --ff-only`):
+- [x] **8.0 Preparazione** — fatta il 15/11/2026: app Android registrata, `google-services.json` in `Desktop\cns-chiavi`, Email/password attivato (da provare nella 8.2). Nella 8.1 aggiungere a `.gitignore`: `google-services.json`, `key.properties`, `*.jks`, `*.keystore`. Programma originale (la fai tu, con la mia guida): app Android `it.stardustxyz.cns` nel progetto Firebase di CNS, impronta SHA-1 della chiave di debug, accesso con email e password attivato in Authentication, `google-services.json` in `Desktop\cns-chiavi` (mai in git). Facoltativo ma utile: ruolo "Firebase Rules Admin" all'account di servizio, così le regole nuove si pubblicano da GitHub invece che a mano.
+- [x] **8.1 Scheletro** — fatta il 15/11/2026 (Nineteenth Commit, provata sul telefono): progetto `mobile/`, tema verde e nero (#008000 e #33A833 come il web), menu in basso con scorrimento tra le pagine, icona con le cuffie (classica, adattiva, a tema, bianca per le notifiche), schermata di avvio scura, testi di Flutter in italiano.
+- [ ] **8.2 Accesso e ammessi**: Google + email e password con conferma dell'email, stessa lista `config/ammessi` dell'app web, pagina Ammessi per l'amministratore, uscita con conferma, messaggio per chi non è ammesso.
+- [ ] **8.3 Liste e ricerca**: Controllare e Recuperando da Firestore, ricerca su Deezer (nome o link), aggiunta, contatori.
+  - [ ] *Nuovo* – **Importare artisti** in un colpo solo, in due modi:
+    - dal link di un **profilo Deezer pubblico**, con gli artisti preferiti di quel profilo;
+    - da un **elenco di nomi incollato**, uno per riga: ogni nome viene cercato su Deezer, con una pausa tra le ricerche, usando la stessa regola "nome uguale con più fan".
+
+    Prima di salvare, una schermata mostra cosa è stato trovato. Lì puoi togliere gli artisti sbagliati e scegliere se metterli in Controllare o in Recuperando. Chi è già in una lista viene saltato. Se il profilo è privato, l'app lo dice chiaramente.
+- [ ] **8.4 Pagina dell'artista**: lista, nota, avvisi, discografia con i doppioni uniti e la copia sul telefono, segnalibro (Ascoltato, Salta, Annulla, Arrivato qui, fine discografia), pulsanti Spotify e Deezer.
+  - [ ] *Nuovo* – **Lista delle canzoni** di ogni uscita: toccandola si apre l'elenco dei brani, con numero, titolo e durata, la durata totale e i dischi separati se sono più di uno.
+  - [ ] *Nuovo* – **Ordine libero**: non serve più seguire l'ordine della discografia.
+    - Ogni uscita ha il suo "✓ Ascoltato", accanto ad "Arrivato qui".
+    - Nella lista delle canzoni si può spuntare **una canzone alla volta**, a caso.
+    - L'uscita conta come ascoltata quando sono spuntate tutte le sue canzoni, oppure quando la segni tu.
+    - Le canzoni spuntate si salvano nel documento dell'artista, in un campo nuovo accanto a `fatte`. Le regole di Firestore non vanno cambiate.
+    - Anche l'app web deve leggere questo campo, per non perdere le spunte.
+  - [ ] *Nuovo* – **"Ti potrebbero piacere"**: nella pagina dell'artista, una riga con gli artisti simili dati da Deezer, ognuno con il pulsante + per aggiungerlo. Chi è già in una lista non compare.
+  - [ ] *Nuovo* – **"Cosa ascolto adesso?"**: un pulsante in Recuperando che sceglie a caso un'uscita non ancora fatta tra tutti gli artisti in Recuperando. Mostra copertina, artista e titolo, con i pulsanti "Ascoltato", "Un'altra" e "Apri su Spotify". Si possono escludere i singoli, se vuoi solo album.
+- [ ] **8.5 Novità e In arrivo**, con Spotify, Deezer e Apple Music, e il contatore delle nuove.
+  - [ ] *Nuovo* – **Widget Android** per la schermata principale, in due versioni:
+    - "Ultime uscite", con le ultime 3 Novità;
+    - "Prossimo da recuperare", con l'uscita successiva di un artista in Recuperando.
+
+    Toccandolo si apre l'app nel punto giusto. Il widget mostra i dati salvati dall'app l'ultima volta che è stata aperta. Con le notifiche native della Fase 8.7 si aggiorna anche quando arriva una novità.
+- [ ] **8.6 Copia di sicurezza** compatibile con quella dell'app web (un file fatto dal web si ripristina nell'app e viceversa).
+- [ ] **8.7 Notifiche native (FCM)**: permesso di Android 13, scelta salvata nell'account, telefoni in `utenti/{uid}/telefoni`, regole nuove, invio dal controllo di GitHub, notte senza suono con un canale silenzioso, tocco che apre l'uscita nell'app. Poi ntfy tolto o lasciato, secondo la decisione 1.
+- [ ] **8.8 Versione firmata e pubblicazione**: chiave di firma, release su GitHub `app-vX.Y.Z` (non pre-release) con l'APK, avviso di aggiornamento nell'app, pagina Privacy, "Elimina l'account" (che cancella anche artisti, Novità, In arrivo e telefoni), README.
+- [ ] **8.9 Prova con gli amici.**
+
+**Decisioni prese il 15/11/2026:**
+1. **Notifiche**: FCM semplice (notifica nativa affidabile; toccandola si apre l'app sull'uscita, con Spotify a un tocco). **ntfy resta come scelta** per chi usa solo l'app web; si decide se toglierlo solo dopo che FCM funziona.
+2. **Pacchetto** `it.stardustxyz.cns`, nome sotto l'icona **CNS** (proposta, si può ancora cambiare prima della Fase 8.0).
+3. **Menu in basso come il web**: Controllare · Recuperando · Novità · Impostazioni. La ricerca è il pulsante + nelle liste; account, ammessi, notifiche e copia stanno in Impostazioni.
+4. **Chiave di firma nuova**: `cns-firma.jks`, in `Desktop\cns-chiavi` con `google-services.json` (mai in git).
+5. **Email e password solo nell'app Android** (come CNV); l'app web resta con Google.
+6. **Funzioni nuove** (segnate con *Nuovo* nelle fasi 8.3–8.5): importazione degli artisti, lista delle canzoni, ordine libero con spunta per canzone, "Ti potrebbero piacere", "Cosa ascolto adesso?" e widget Android. Si fanno **direttamente nell'app Flutter**, per non scriverle due volte. Nell'app web arriva solo quello che serve perché le due app restino d'accordo: la lettura delle canzoni spuntate.
+
+   Deezer dà tutto gratis:
+   - le canzoni e le durate da `album/{id}/tracks`;
+   - gli artisti simili da `artist/{id}/related`;
+   - gli artisti preferiti di un profilo pubblico da `user/{id}/artists`.
+
+   Da provare all'inizio della fase in cui servono.
+
+**A parte, non legato all'app**: il controllo ogni 3 ore parte meno spesso del previsto. Si può aggiungere un secondo orario programmato sfasato (come i "due giri" di CNV), così se GitHub ne salta uno l'altro c'è.
+
+### Fase 9 – Lettore MP3 (progetto a parte, più avanti)
 - [ ] Importazione dei file scelti dal telefono, salvati nello spazio dell'app.
 - [ ] Libreria per artista e album dai tag, con i featuring divisi ("feat.", "&", ",").
 - [ ] Playlist e riproduzione in background con i comandi nella schermata di blocco.
