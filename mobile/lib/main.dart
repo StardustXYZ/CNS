@@ -4,15 +4,18 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'data/account.dart';
 import 'data/artists.dart';
+import 'data/backup.dart';
 import 'data/deezer.dart';
 import 'data/discography_store.dart';
 import 'data/firebase_account.dart';
 import 'data/firebase_artists.dart';
+import 'data/firebase_backup.dart';
 import 'data/firebase_news.dart';
 import 'data/home_widget_sync.dart';
 import 'data/news.dart';
 import 'home.dart';
 import 'pages/account_pages.dart';
+import 'pages/impostazioni_page.dart' show BackupScope;
 import 'pages/list_pages.dart';
 import 'pages/novita_page.dart';
 import 'pages/widgets.dart';
@@ -23,11 +26,13 @@ Future<void> main() async {
   AccountBackend? accountBackend;
   ArtistsBackend? artistsBackend;
   NewsBackend? newsBackend;
+  BackupBackend? backupBackend;
   try {
     await Firebase.initializeApp(); // from android/app/google-services.json
     accountBackend = FirebaseAccountBackend();
     artistsBackend = FirebaseArtistsBackend();
     newsBackend = FirebaseNewsBackend();
+    backupBackend = FirebaseBackupBackend();
   } catch (err) {
     debugPrint('Firebase non avviato: $err'); // the access screen says that the account is not available
   }
@@ -36,7 +41,17 @@ Future<void> main() async {
   final artists = ArtistStore(account, artistsBackend);
   final news = NewsStore(account, newsBackend, FileSeenStore());
   final discographies = DiscographyStore(deezer, FileDiscoCache());
-  runApp(CnsApp(account: account, artists: artists, deezer: deezer, discographies: discographies, news: news));
+  final backup = BackupService(account, artists, news, backupBackend, PickerFiles());
+  runApp(
+    CnsApp(
+      account: account,
+      artists: artists,
+      deezer: deezer,
+      discographies: discographies,
+      news: news,
+      backup: backup,
+    ),
+  );
   // The home screen widgets: their texts follow the app, a tap opens the right page
   try {
     final bridge = HomeWidgetBridge();
@@ -57,6 +72,7 @@ class CnsApp extends StatelessWidget {
     required this.deezer,
     required this.discographies,
     required this.news,
+    required this.backup,
   });
 
   // With fakes in the tests
@@ -65,6 +81,7 @@ class CnsApp extends StatelessWidget {
   final DeezerApi deezer;
   final DiscographyStore discographies;
   final NewsStore news;
+  final BackupService backup;
 
   @override
   Widget build(BuildContext context) {
@@ -79,15 +96,18 @@ class CnsApp extends StatelessWidget {
             store: discographies,
             child: NewsScope(
               store: news,
-              child: MaterialApp(
-                title: 'CNS',
-                debugShowCheckedModeBanner: false,
-                theme: cnsTheme(),
-                // Flutter's own texts (dates, "Annulla", "Incolla"…) in Italian
-                locale: const Locale('it'),
-                supportedLocales: const [Locale('it')],
-                localizationsDelegates: GlobalMaterialLocalizations.delegates,
-                home: const AccessGate(child: HomeShell()),
+              child: BackupScope(
+                service: backup,
+                child: MaterialApp(
+                  title: 'CNS',
+                  debugShowCheckedModeBanner: false,
+                  theme: cnsTheme(),
+                  // Flutter's own texts (dates, "Annulla", "Incolla"…) in Italian
+                  locale: const Locale('it'),
+                  supportedLocales: const [Locale('it')],
+                  localizationsDelegates: GlobalMaterialLocalizations.delegates,
+                  home: const AccessGate(child: HomeShell()),
+                ),
               ),
             ),
           ),

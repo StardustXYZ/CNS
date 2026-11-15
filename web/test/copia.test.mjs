@@ -60,3 +60,18 @@ test("file sbagliati: messaggi chiari", () => {
     assert.throws(() => parseBackup(JSON.stringify({ formato: FORMAT, versione: 99, artisti: [] })), /versione più nuova/);
     assert.equal(parseBackup(JSON.stringify({ formato: FORMAT, versione: 1, artisti: [], impostazioni: { ntfy: "con spazi" } })).ntfy, null);
 });
+
+// The Android app writes the same file (mobile/lib/data/copia.dart): its copy is restored here
+import { readFileSync as readFixture } from "node:fs";
+
+test("una copia fatta dall'app Android si ripristina nell'app web", () => {
+    const text = readFixture(new URL("../../tests/fixtures/copia_app.json", import.meta.url), "utf8");
+    const restored = parseBackup(text);
+    assert.deepEqual(restored.artists.map((a) => a.id), ["4050205", "7402526"]);
+    assert.equal(restored.ntfy, "cns-prova-123");
+    assert.equal(restored.skipped, 0);
+    const lol = restored.artists[1];
+    assert.deepEqual(lol.fatte, { "single|warriors": { s: "a", t: 1763000000000 } });
+    assert.deepEqual(lol.canzoni, { "album|arcane league of legends": { enemy: 1763000000002, playground: 1763000000003 } });
+    assert.equal(restored.artists[0].aggiunto, undefined);
+});

@@ -11,8 +11,18 @@ class FirebaseArtistsBackend implements ArtistsBackend {
   CollectionReference<Map<String, dynamic>> _artists(String uid) => _db.collection('utenti/$uid/artisti');
 
   @override
-  Stream<List<SavedArtist>> watch(String uid) =>
-      _artists(uid).snapshots().map((snap) => [for (final d in snap.docs) SavedArtist.fromMap(d.id, d.data())]);
+  Stream<List<SavedArtist>> watch(String uid) => _artists(uid)
+      .snapshots()
+      .map((snap) => [for (final d in snap.docs) SavedArtist.fromMap(d.id, _dates(d.data()) as Map<String, dynamic>)]);
+
+  /// Firestore's dates (Timestamp, e.g. "aggiunto") as DateTime: the rest of the app (and the
+  /// backup file) does not need to know about Firestore.
+  static Object? _dates(Object? value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is Map) return <String, dynamic>{for (final e in value.entries) '${e.key}': _dates(e.value)};
+    if (value is List) return [for (final v in value) _dates(v)];
+    return value;
+  }
 
   @override
   Future<void> add(String uid, List<DeezerArtist> artists, String lista) async {

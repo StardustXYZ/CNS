@@ -1,0 +1,57 @@
+{
+ "formato": "cns-copia",
+ "versione": 1,
+ "salvata": "2026-11-15T16:00:00.000Z",
+ "account": "amico@example.com",
+ "impostazioni": {
+  "ntfy": "cns-prova-123"
+ },
+ "artisti": [
+  {
+   "id": "4050205",
+   "nome": "Ava Max",
+   "lista": "controllare",
+   "nota": "aspetto il nuovo album",
+   "foto": "https://cdn/ava.jpg",
+   "fan": 1235611,
+   "tipi_avviso": [
+    "album",
+    "single"
+   ],
+   "aggiunto": "2026-11-12T19:00:00.000Z"
+  },
+  {
+   "id": "7402526",
+   "nome": "League of Legends",
+   "lista": "recuperando",
+   "nota": "",
+   "fatte": {
+    "single|warriors": {
+     "s": "a",
+     "t": 1763000000000
+    }
+   },
+   "canzoni": {
+    "album|arcane league of legends": {
+     "enemy": 1763000000002,
+     "playground": 1763000000003
+    }
+   },
+   "tipi_recupero": [
+    "album",
+    "single"
+   ],
+   "auto_sposta": true
+  }
+ ],
+ "novita": [
+  {
+   "id": "1",
+   "artista": "Ava Max",
+   "artista_id": "4050205",
+   "titolo": "Prova",
+   "notificata": "2026-11-14T18:00:00.000Z"
+  }
+ ],
+ "in_arrivo": []
+}

@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:cns/data/account.dart';
 import 'package:cns/data/artists.dart';
+import 'package:cns/data/backup.dart';
 import 'package:cns/data/deezer.dart';
 import 'package:cns/data/discografia.dart';
 import 'package:cns/data/discography_store.dart';
 import 'package:cns/data/news.dart';
 import 'package:cns/main.dart';
 
+import 'copia_test.dart' show FakeFiles;
 import 'fake_account.dart';
 
 /// Firestore's artists in memory (the documents as maps), with the live updates of snapshots().
@@ -146,6 +148,31 @@ class FakeNewsBackend implements NewsBackend {
   }
 }
 
+/// The settings and the restore in memory; the restored artists go into the fake artists.
+class FakeBackupBackend implements BackupBackend {
+  FakeBackupBackend(this.artists);
+
+  final FakeArtistsBackend artists;
+  final settings = <String, Map<String, dynamic>>{};
+  final restored = <(String, Map<String, dynamic>)>[];
+
+  @override
+  Future<Map<String, dynamic>> readSettings(String uid) async => {...?settings[uid]};
+
+  @override
+  Future<void> restoreArtists(String uid, List<(String, Map<String, dynamic>)> list) async {
+    restored.addAll(list);
+    for (final (id, fields) in list) {
+      artists.put(uid, id, fields);
+    }
+    artists._changes.add(uid);
+  }
+
+  @override
+  Future<void> saveSettings(String uid, Map<String, dynamic> fields) async =>
+      settings[uid] = {...?settings[uid], ...fields};
+}
+
 /// The whole app with fakes: account, artists, Deezer and the copy of the discographies.
 class TestApp {
   TestApp() {
@@ -153,6 +180,8 @@ class TestApp {
     artists = ArtistStore(account, artistsBackend);
     discos = DiscographyStore(deezer, cache, now: () => clock);
     news = NewsStore(account, newsBackend, seen, now: () => clock);
+    backupBackend = FakeBackupBackend(artistsBackend);
+    backup = BackupService(account, artists, news, backupBackend, files, now: () => clock);
   }
 
   final accountBackend = FakeBackend();
@@ -166,6 +195,16 @@ class TestApp {
   late final ArtistStore artists;
   late final DiscographyStore discos;
   late final NewsStore news;
+  late final FakeBackupBackend backupBackend;
+  late final BackupService backup;
+  final files = FakeFiles();
 
-  CnsApp get widget => CnsApp(account: account, artists: artists, deezer: deezer, discographies: discos, news: news);
+  CnsApp get widget => CnsApp(
+        account: account,
+        artists: artists,
+        deezer: deezer,
+        discographies: discos,
+        news: news,
+        backup: backup,
+      );
 }
