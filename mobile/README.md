@@ -20,8 +20,11 @@ flutter test
 flutter build apk --release
 ```
 
-L'APK si trova in `build/app/outputs/flutter-apk/app-release.apk`. Con `key.properties` è
-firmato con la chiave definitiva; senza, con la chiave di prova del PC.
+L'APK si trova in `build/app/outputs/flutter-apk/app-release.apk`, firmato con la chiave
+definitiva di `key.properties`. Senza quel file la costruzione si ferma con un avviso: un APK
+firmato con la chiave di prova non si può pubblicare, perché chi ha già la versione vera non
+potrebbe aggiornarlo. Per un APK di prova solo per te, sul PC: `CNS_FIRMA_DI_PROVA=1` prima
+di `flutter build apk --release` (in PowerShell: `$env:CNS_FIRMA_DI_PROVA = "1"`).
 
 ## Pubblicare una versione
 
