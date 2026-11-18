@@ -33,7 +33,7 @@ import os
 import re
 import sys
 import time
-from typing import Callable, NamedTuple
+from typing import Awaitable, Callable, NamedTuple
 from zoneinfo import ZoneInfo
 
 from app.config import settings
@@ -231,6 +231,7 @@ class Delivery(NamedTuple):
 
     releases_ok: bool = True
     others_ok: bool = True
+    admitted: bool = True  # False: the person is not admitted (any more) and was told nothing
 
 
 async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
@@ -250,7 +251,7 @@ async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
     settings_doc = await db.get(f"utenti/{uid}") or {}
     if not is_admitted(uid, settings_doc, allow_list):
         report.not_admitted += 1  # removed from the list: nothing more for them
-        return Delivery()
+        return Delivery(admitted=False)
     pending: list[NewRelease] = []
     tries: dict[str, int] = {}  # release id -> tries so far, this one included
     first_told: dict[str, datetime] = {}  # release id -> when it first reached Novità
@@ -316,15 +317,18 @@ async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
     return Delivery(releases_ok=not retry, others_ok=not other_failed)
 
 
-async def settle_announcements(db: DocumentStore, uid: str, news: UserNews, delivered: bool, now: datetime,
+async def settle_announcements(db: DocumentStore, uid: str, news: UserNews, delivery: Delivery, now: datetime,
                                saved: dict[str, dict[str, dict]], report: Report) -> None:
     """After telling a person: an announcement or reminder that went out is closed; one that
-    failed stays open for the next run, until ``MAX_ATTEMPTS`` tries in all.
+    failed stays open for the next run, until ``MAX_ATTEMPTS`` tries in all. For someone who is
+    not admitted (any more) they are closed too, so they do not come back every run, but the
+    reminder is not counted as sent.
 
     An announcement stays marked ``da_riprovare`` until it is told; a reminder stays
     ``promemoria: None``, so it is due again the same day.
     """
     mine = saved.setdefault(uid, {})
+    delivered = delivery.others_ok
     for key in news.announced_keys:
         doc = mine[key]
         tries = int(doc.get("tentativi") or 0) + 1
@@ -338,7 +342,7 @@ async def settle_announcements(db: DocumentStore, uid: str, news: UserNews, deli
         tries = int(doc.get("tentativi_promemoria") or 0) + 1
         if delivered or tries >= MAX_ATTEMPTS:
             mine[key] = {**{k: v for k, v in doc.items() if k != "tentativi_promemoria"}, "promemoria": now}
-            report.reminders += delivered
+            report.reminders += delivered and delivery.admitted
         else:
             mine[key] = {**doc, "tentativi_promemoria": tries}
         await db.set(f"utenti/{uid}/anteprime/{key}", mine[key])
@@ -367,8 +371,10 @@ def announcements_by_user(documents: list[tuple[str, dict]]) -> dict[str, dict[s
 
 async def check_announcements(db: DocumentStore, itunes: ReleaseSource, artist: FollowedArtist,
                               releases: list[DeezerRelease], seen: dict | None, now: datetime,
-                              saved: dict[str, dict[str, dict]], report: Report) -> dict:
-    """The artist's pre-orders on iTunes, saved for the people who have it in Controllare.
+                              saved: dict[str, dict[str, dict]], report: Report,
+                              admitted: Callable[[str], Awaitable[bool]]) -> dict:
+    """The artist's pre-orders on iTunes, saved for the people who have it in Controllare
+    (and are admitted: for the others nothing is created).
     A new one is saved marked ``da_riprovare``: ``run_check`` tells it and ``settle_announcements``
     closes it, so an announcement is never lost between saving and telling. Returns the iTunes
     fields to keep with the releases already seen."""
@@ -381,7 +387,7 @@ async def check_announcements(db: DocumentStore, itunes: ReleaseSource, artist: 
     if itunes_id:
         report.itunes_matched += 1
     for uid, data in artist.followers.items():
-        if data.get("lista") != NOTIFY_LIST:
+        if data.get("lista") != NOTIFY_LIST or not await admitted(uid):
             continue
         kinds = wanted_kinds(data)
         mine = saved.setdefault(uid, {})
@@ -412,6 +418,13 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
     lists = Counter(data.get("lista") for a in artists.values() for data in a.followers.values())
     saved_announcements = announcements_by_user(await db.collection_group("anteprime")) if itunes else {}
     allow_list = await db.get(ALLOW_LIST_PATH)
+    admission: dict[str, bool] = {}  # asked once per person in a run
+
+    async def admitted(uid: str) -> bool:
+        if uid not in admission:
+            admission[uid] = is_admitted(uid, await db.get(f"utenti/{uid}") or {}, allow_list)
+        return admission[uid]
+
     phones = phones_by_user(await db.collection_group("telefoni")) if push else {}
     report = Report()
     report.phones = sum(len(p) for p in phones.values())
@@ -444,7 +457,7 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
                     recipients.setdefault(artist.id, set()).add(uid)
         fields = itunes_fields(seen)
         if itunes and any(d.get("lista") == NOTIFY_LIST for d in artist.followers.values()):
-            fields = await check_announcements(db, itunes, artist, releases, seen, now, saved_announcements, report)
+            fields = await check_announcements(db, itunes, artist, releases, seen, now, saved_announcements, report, admitted)
         pending_seen[artist.id] = {**seen_state(artist, releases, now, seen), **fields}
     # What is still to tell about the announced releases: the new ones and the ones whose
     # notification failed before (``da_riprovare``), and the reminders of the release day (not
@@ -472,7 +485,7 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
         delivery = await tell_user(db, uid, user_news, now, sender_for, report, allow_list, phones.get(uid, []), push)
         if not delivery.releases_ok:
             to_retry.add(uid)
-        await settle_announcements(db, uid, user_news, delivery.others_ok, now, saved_announcements, report)
+        await settle_announcements(db, uid, user_news, delivery, now, saved_announcements, report)
     for artist_id, state in pending_seen.items():
         if recipients.get(artist_id, set()) & to_retry:
             report.to_retry += 1

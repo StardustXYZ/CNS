@@ -314,3 +314,38 @@ async def test_a_failed_announcement_does_not_repeat_the_new_release_notificatio
     second = PickyNtfy()
     await check(s, itunes, second, deezer)
     assert [n.title for n in second.sent] == ["In arrivo: Ava Max"]  # only the announcement
+
+
+# ---- People who are not admitted (any more) get nothing, not even the documents of "In arrivo" ----
+
+def with_a_removed_person(**extra):
+    s = store(extra={
+        "utenti/ex": {"ntfy": "argomento-dell-ex", "email": "ex@example.com"},
+        f"utenti/ex/artisti/{AVA}": {"nome": "Ava Max", "lista": "controllare"},
+        **extra,
+    })
+    return s
+
+
+async def test_a_person_not_admitted_gets_no_announcement_documents():
+    s = with_a_removed_person()
+    ntfy, lines = await run(s, FakeItunes(NEW_ALBUM))
+    assert "utenti/vincenzo/anteprime/950" in s.docs
+    assert not any(p.startswith("utenti/ex/anteprime/") for p in s.docs)
+    assert [n.title for n in ntfy.sent] == ["In arrivo: Ava Max"]
+    assert "| Uscite in arrivo annunciate ora | 1 |" in lines  # one person, not two
+
+
+async def test_without_the_allow_list_no_announcement_documents_are_created():
+    s = store()
+    del s.docs["config/ammessi"]
+    ntfy, _ = await run(s, FakeItunes(NEW_ALBUM))
+    assert ntfy.sent == [] and not any("/anteprime/" in p for p in s.docs)
+
+
+async def test_a_reminder_for_someone_not_admitted_is_not_counted_as_sent():
+    s = with_a_removed_person(**{"utenti/ex/anteprime/950": dict(ANNOUNCED)})
+    del s.docs["utenti/vincenzo/artisti/" + AVA]  # only the removed person is left
+    ntfy, lines = await run(s, FakeItunes(NEW_ALBUM), now=DAY)
+    assert ntfy.sent == []
+    assert "| Promemoria «esce oggi» | 0 |" in lines
