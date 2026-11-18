@@ -29,3 +29,7 @@ site/
 firebase-debug.log
 firestore-debug.log
 *.log
+
+# Strumenti di Claude Code: istruzioni locali e grafo del progetto
+CLAUDE.md
+graphify-out/
