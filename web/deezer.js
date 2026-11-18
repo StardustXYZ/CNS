@@ -12,6 +12,19 @@ export function normalize(text) {
         .replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
 }
 
+/** An address worth opening or showing: only http(s) addresses pass, as they are. Anything else
+ * ("javascript:", "data:", "intent:", a relative path, …) becomes "", so a bad value saved in
+ * Firestore or in a backup file can never become a link or an image of the page. */
+export function safeUrl(value) {
+    if (typeof value !== "string") return "";
+    try {
+        const { protocol } = new URL(value);
+        return protocol === "https:" || protocol === "http:" ? value : "";
+    } catch {
+        return "";
+    }
+}
+
 /** The artist code in a Deezer link ("https://www.deezer.com/it/artist/12948083?..."), or null. */
 export function artistIdFromLink(text) {
     const match = String(text || "").match(/deezer\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?artist\/(\d{1,20})/i);

@@ -13,9 +13,18 @@ class DiscographyScope extends InheritedNotifier<DiscographyStore> {
       context.dependOnInheritedWidgetOfExactType<DiscographyScope>()!.notifier!;
 }
 
+/// Whether the text is a web address (https or http). Links come from Firestore, from
+/// Deezer and from backup files: anything else ("intent:", "tel:", "javascript:", …) is
+/// never launched.
+bool isWebLink(String url) {
+  final uri = Uri.tryParse(url.trim());
+  return uri != null && uri.hasAuthority && (uri.scheme == 'https' || uri.scheme == 'http');
+}
+
 /// Opens a link in its app (Spotify, Deezer) or in the browser.
 Future<void> openLink(BuildContext context, String url) async {
-  final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication).catchError((_) => false);
+  final ok = isWebLink(url) &&
+      await launchUrl(Uri.parse(url.trim()), mode: LaunchMode.externalApplication).catchError((_) => false);
   if (!ok && context.mounted) say(context, 'Non riesco ad aprire il link.');
 }
 

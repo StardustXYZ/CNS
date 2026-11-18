@@ -3,7 +3,7 @@
 // menu stays on one line and a sideways swipe moves to the next or previous page.
 // Every Google account has its own lists in Firebase (utenti/{code}/artisti); artists are
 // found on Deezer. (A module: strict mode is implied.)
-import { artistIdFromLink, fansLabel, getArtist, getDiscography, searchArtists } from "./deezer.js";
+import { artistIdFromLink, fansLabel, getArtist, getDiscography, safeUrl, searchArtists } from "./deezer.js";
 import { KINDS, arrange, countKinds, dateLabel, groupReleases, releaseFromApi, spotifySearchUrl } from "./discografia.js";
 import { DEFAULT_KINDS, LISTENED, SKIPPED, mark, markUpTo, progress, queueOf, undoLast, unmark } from "./segnalibro.js";
 import { backupFileName, buildBackup, parseBackup } from "./copia.js";
@@ -106,7 +106,7 @@ function emptyState(icon, text, note) {
 }
 
 function photo(src, cls = "artist-photo") {
-    return src
+    return safeUrl(src)
         ? `<img class="${cls}" src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
         : `<span class="${cls} placeholder" aria-hidden="true">🎤</span>`;
 }
@@ -239,7 +239,7 @@ function daysLeftLabel(iso) {
 }
 
 function announcementRow(n, showArtist = true) {
-    const cover = n.copertina
+    const cover = safeUrl(n.copertina)
         ? `<img class="cover" src="${esc(n.copertina)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
         : `<span class="cover placeholder" aria-hidden="true">📅</span>`;
     const isToday = n.data === todayIso();
@@ -249,8 +249,8 @@ function announcementRow(n, showArtist = true) {
             <span class="small">${artist}${esc(KINDS[n.tipo]?.label || "Uscita")}</span>
             <span class="when">${esc(daysLeftLabel(n.data))}</span></div>
         <div class="release-actions">
-            ${isToday ? `<a class="btn btn-small btn-primary" href="${esc(n.spotify || spotifySearchUrl(n.artista, n.titolo))}" target="_blank" rel="noopener">Spotify</a>` : ""}
-            ${n.link ? `<a class="btn btn-small" href="${esc(n.link)}" target="_blank" rel="noopener">Apple Music</a>` : ""}
+            ${isToday ? `<a class="btn btn-small btn-primary" href="${esc(safeUrl(n.spotify) || spotifySearchUrl(n.artista, n.titolo))}" target="_blank" rel="noopener">Spotify</a>` : ""}
+            ${safeUrl(n.link) ? `<a class="btn btn-small" href="${esc(n.link)}" target="_blank" rel="noopener">Apple Music</a>` : ""}
         </div></div>`;
 }
 
@@ -261,7 +261,7 @@ function comingSection(a) {
 }
 
 function novitaRow(n) {
-    const cover = n.copertina
+    const cover = safeUrl(n.copertina)
         ? `<img class="cover" src="${esc(n.copertina)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
         : `<span class="cover placeholder" aria-hidden="true">💿</span>`;
     const when = n.notificata?.toDate?.();
@@ -270,8 +270,8 @@ function novitaRow(n) {
             <span class="small"><a href="#/artista/${esc(n.artista_id)}">${esc(n.artista)}</a> · ${esc(KINDS[n.tipo]?.label || "Uscita")} · ${esc(dateLabel(n.data))}</span>
             ${when ? `<span class="small">notificata il ${esc(dateTime(when))}</span>` : ""}</div>
         <div class="release-actions">
-            <a class="btn btn-small btn-primary" href="${esc(n.spotify || spotifySearchUrl(n.artista, n.titolo))}" target="_blank" rel="noopener">Spotify</a>
-            ${n.link ? `<a class="btn btn-small" href="${esc(n.link)}" target="_blank" rel="noopener">Deezer</a>` : ""}
+            <a class="btn btn-small btn-primary" href="${esc(safeUrl(n.spotify) || spotifySearchUrl(n.artista, n.titolo))}" target="_blank" rel="noopener">Spotify</a>
+            ${safeUrl(n.link) ? `<a class="btn btn-small" href="${esc(n.link)}" target="_blank" rel="noopener">Deezer</a>` : ""}
         </div></div>`;
 }
 
@@ -361,7 +361,7 @@ function pageArtist(id) {
     return `<div class="artist-layout"><div class="artist-side">
         <div class="artist-hero">${photo(a.foto, "artist-photo big")}
             <div><h1>${esc(a.nome)}</h1>${a.fan ? `<p class="subtitle">${esc(fansLabel(a.fan))}</p>` : ""}
-            ${a.link ? `<p class="card-action"><a class="btn" href="${esc(a.link)}" target="_blank" rel="noopener">Apri su Deezer</a></p>` : ""}</div>
+            ${safeUrl(a.link) ? `<p class="card-action"><a class="btn" href="${esc(a.link)}" target="_blank" rel="noopener">Apri su Deezer</a></p>` : ""}</div>
         </div>
         ${errorNotice()}${infoNotice()}
         ${a.lista === "recuperando" ? bookmarkSection(a) : ""}
@@ -476,19 +476,19 @@ function bookmarkMark(a, g, queue) {
 
 function releaseRow(a, g, queue = null) {
     const r = g.main;
-    const cover = r.cover
+    const cover = safeUrl(r.cover)
         ? `<img class="cover" src="${esc(r.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
         : `<span class="cover placeholder" aria-hidden="true">💿</span>`;
     const versions = g.versions.length
         ? `<details class="versions"><summary>+${g.versions.length} ${g.versions.length === 1 ? "versione" : "versioni"}</summary><ul>${g.versions.map((v) =>
-            `<li><a href="${esc(v.link)}" target="_blank" rel="noopener">${esc(v.title)}</a> <span class="small">· ${esc(dateLabel(v.date))}</span></li>`).join("")}</ul></details>`
+            `<li>${safeUrl(v.link) ? `<a href="${esc(v.link)}" target="_blank" rel="noopener">${esc(v.title)}</a>` : esc(v.title)} <span class="small">· ${esc(dateLabel(v.date))}</span></li>`).join("")}</ul></details>`
         : "";
     return `<div class="release">${cover}
         <div class="release-info"><strong>${esc(r.title)}</strong>
             <span class="small">${esc(KINDS[g.kind].label)} · ${esc(dateLabel(g.date))}${r.explicit ? " · 🅴" : ""}</span>${versions}${bookmarkMark(a, g, queue)}</div>
         <div class="release-actions">
             <a class="btn btn-small btn-primary" href="${esc(spotifySearchUrl(a.nome, r.title))}" target="_blank" rel="noopener">Spotify</a>
-            <a class="btn btn-small" href="${esc(r.link)}" target="_blank" rel="noopener">Deezer</a>
+            ${safeUrl(r.link) ? `<a class="btn btn-small" href="${esc(r.link)}" target="_blank" rel="noopener">Deezer</a>` : ""}
         </div></div>`;
 }
 
@@ -543,7 +543,7 @@ function bookmarkSection(a) {
         const g = queue.next;
         const r = g.main;
         const p = progress(queue);
-        const cover = r.cover
+        const cover = safeUrl(r.cover)
             ? `<img class="cover" src="${esc(r.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
             : `<span class="cover placeholder" aria-hidden="true">💿</span>`;
         body = `<div class="card bookmark">
@@ -553,7 +553,7 @@ function bookmarkSection(a) {
                     <span class="small">${esc(KINDS[g.kind].label)} · ${esc(dateLabel(g.date))}</span></div>
                 <div class="release-actions">
                     <a class="btn btn-small btn-primary" href="${esc(spotifySearchUrl(a.nome, r.title))}" target="_blank" rel="noopener">Spotify</a>
-                    <a class="btn btn-small" href="${esc(r.link)}" target="_blank" rel="noopener">Deezer</a>
+                    ${safeUrl(r.link) ? `<a class="btn btn-small" href="${esc(r.link)}" target="_blank" rel="noopener">Deezer</a>` : ""}
                 </div></div>
             <p class="card-action button-row">
                 <button class="btn btn-primary" data-action="bm-listened" data-id="${id}" data-key="${esc(g.key)}">✓ Ascoltato</button>

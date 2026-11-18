@@ -75,3 +75,16 @@ test("una copia fatta dall'app Android si ripristina nell'app web", () => {
     assert.deepEqual(lol.canzoni, { "album|arcane league of legends": { enemy: 1763000000002, playground: 1763000000003 } });
     assert.equal(restored.artists[0].aggiunto, undefined);
 });
+
+test("al ripristino i link e le foto che non sono indirizzi web vengono tolti", () => {
+    const evil = { ...AVA, foto: "javascript:alert(1)", link: "data:text/html,<script>alert(1)</script>" };
+    const fine = { ...LOL, foto: "https://cdn/lol.jpg", link: "https://www.deezer.com/artist/7402526" };
+    const text = JSON.stringify({ formato: FORMAT, versione: 1, artisti: [evil, fine] });
+    const { artists, skipped } = parseBackup(text);
+    assert.equal(skipped, 0);
+    assert.equal(artists.length, 2);  // the artist stays: only the bad addresses go
+    assert.ok(!("foto" in artists[0]) && !("link" in artists[0]));
+    assert.equal(artists[0].nome, "Ava Max");
+    assert.equal(artists[1].foto, "https://cdn/lol.jpg");
+    assert.equal(artists[1].link, "https://www.deezer.com/artist/7402526");
+});

@@ -4,6 +4,8 @@
 // Novità and "In arrivo" are written only by GitHub, so they stay in the file as a record.
 // Pure functions (tested in web/test/copia.test.mjs), no network.
 
+import { safeUrl } from "./deezer.js";
+
 export const FORMAT = "cns-copia";
 export const VERSION = 1;
 const LISTS = ["controllare", "recuperando", "archivio"];
@@ -58,6 +60,9 @@ export function parseBackup(text) {
         if (!/^[0-9]{1,20}$/.test(id) || typeof raw.nome !== "string" || !raw.nome.trim() || !LISTS.includes(raw.lista)) continue;
         const fields = Object.fromEntries(ARTIST_FIELDS.filter((k) => raw[k] !== undefined).map((k) => [k, raw[k]]));
         fields.nome = fields.nome.slice(0, 200);
+        for (const key of ["foto", "link"]) {
+            if (key in fields && !safeUrl(fields[key])) delete fields[key];  // not a web address: left out
+        }
         if (typeof fields.nota !== "string") fields.nota = "";
         fields.nota = fields.nota.slice(0, 500);
         artists.push({ id, ...fields });

@@ -1,7 +1,7 @@
 // Pure functions of web/deezer.js (no network). Run with: node --test web/test/
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { artistFromApi, artistIdFromLink, fansLabel, normalize, rankArtists } from "../deezer.js";
+import { artistFromApi, artistIdFromLink, fansLabel, normalize, rankArtists, safeUrl } from "../deezer.js";
 
 test("normalize ignora maiuscole, accenti e punteggiatura", () => {
     assert.equal(normalize("Beyoncé"), "beyonce");
@@ -37,4 +37,13 @@ test("numero di fan in italiano", () => {
 test("artista dalla risposta di Deezer", () => {
     const a = artistFromApi({ id: 12948083, name: "Ava Max", nb_fan: 1235611, nb_album: 114, picture_big: "https://cdn/ava.jpg" });
     assert.deepEqual(a, { id: "12948083", name: "Ava Max", picture: "https://cdn/ava.jpg", fans: 1235611, albums: 114, link: "https://www.deezer.com/artist/12948083" });
+});
+
+test("safeUrl lascia passare solo indirizzi web e restituisce quello originale", () => {
+    assert.equal(safeUrl("https://www.deezer.com/artist/15741"), "https://www.deezer.com/artist/15741");
+    assert.equal(safeUrl("http://cdn.example/a b.jpg"), "http://cdn.example/a b.jpg");
+    for (const bad of ["javascript:alert(1)", "JaVaScRiPt:alert(1)", " javascript:alert(1)", "data:text/html,<b>x</b>",
+        "intent://x#Intent;scheme=http;end", "file:///C:/x", "//evil.example/x", "/relativo", "#/artista/1", "", "   ", null, undefined, 42, {}]) {
+        assert.equal(safeUrl(bad), "", String(bad));
+    }
 });
