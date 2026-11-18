@@ -7,8 +7,11 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from app.controllo import FollowedArtist, run_check, seen_state
+import pytest
+
+from app.controllo import MAX_ATTEMPTS, FollowedArtist, run_check, seen_state
 from app.services.deezer import DeezerRelease
+from app.services.firestore import FirestoreError
 from app.services.itunes import ItunesArtist, ItunesError, ItunesRelease
 
 ROME = ZoneInfo("Europe/Rome")
@@ -186,3 +189,127 @@ async def test_more_than_three_announcements_become_one():
 async def test_report_has_no_titles():
     _, lines = await run(store(), FakeItunes(AVA_ITUNES_OLD + [itunes_rel(950, "Titolo Segreto", "2026-12-04", "album")]))
     assert "Titolo Segreto" not in "\n".join(lines) and "Ava Max" not in "\n".join(lines)
+
+
+# ---- A failure must not lose an announcement or a reminder ----
+
+class FlakyStore(FakeStore):
+    """Firestore has a bad moment the first time a given document is read."""
+
+    def __init__(self, docs, fail_get=()):
+        super().__init__(docs)
+        self.fail_get = set(fail_get)
+
+    async def get(self, path):
+        if path in self.fail_get:
+            self.fail_get.discard(path)
+            raise FirestoreError("Firestore ha risposto con HTTP 503: giù")
+        return await super().get(path)
+
+
+class PickyNtfy:
+    """A sender that fails for the notifications whose title starts with one of ``broken``."""
+
+    def __init__(self, broken=()):
+        self.sent, self.broken = [], tuple(broken)
+
+    def __call__(self, topic):
+        outer = self
+
+        class Sender:
+            async def send(self, n):
+                if outer.broken and n.title.startswith(outer.broken):
+                    raise RuntimeError("ntfy giù")
+                outer.sent.append(n)
+
+        return Sender()
+
+
+NEW_ALBUM = AVA_ITUNES_OLD + [itunes_rel(950, "Nuovo Album", "2026-12-04", "album")]
+ANNOUNCED = {"artista": "Ava Max", "artista_id": AVA, "titolo": "Nuovo Album", "tipo": "album", "data": "2026-12-04",
+             "copertina": "", "link": "", "spotify": "", "avvisata": NOW, "promemoria": None}
+DAY = datetime(2026, 12, 4, 9, 17, tzinfo=ROME)
+
+
+async def check(s, itunes, ntfy, deezer=AVA_DEEZER, now=NOW):
+    return await run_check(s, FakeDeezer(deezer), now, ntfy, itunes)
+
+
+async def test_an_announcement_is_not_lost_if_the_run_stops_before_telling():
+    s = store()
+    s = FlakyStore(s.docs, fail_get=["utenti/vincenzo"])  # the person's settings are read when telling them
+    itunes = FakeItunes(NEW_ALBUM)
+    with pytest.raises(FirestoreError):
+        await check(s, itunes, PickyNtfy())
+    ntfy = PickyNtfy()
+    await check(s, itunes, ntfy)
+    assert [n.title for n in ntfy.sent] == ["In arrivo: Ava Max"]
+    assert "da_riprovare" not in s.docs["utenti/vincenzo/anteprime/950"]
+    again = PickyNtfy()
+    await check(s, itunes, again)
+    assert again.sent == []
+
+
+async def test_a_failed_announcement_is_tried_again_and_then_left_alone():
+    s = store()
+    itunes = FakeItunes(NEW_ALBUM)
+    await check(s, itunes, PickyNtfy(broken=["In arrivo"]))
+    assert s.docs["utenti/vincenzo/anteprime/950"]["da_riprovare"] is True  # it is in the app meanwhile
+    ntfy = PickyNtfy()
+    lines = await check(s, itunes, ntfy)
+    assert [n.title for n in ntfy.sent] == ["In arrivo: Ava Max"]
+    assert "da_riprovare" not in s.docs["utenti/vincenzo/anteprime/950"]
+    assert "| Uscite in arrivo annunciate ora | 0 |" in lines  # the second time it is not new
+    again = PickyNtfy()
+    await check(s, itunes, again)
+    assert again.sent == []
+
+
+async def test_an_announcement_gives_up_after_a_few_runs():
+    s = store()
+    itunes = FakeItunes(NEW_ALBUM)
+    for run_number in range(MAX_ATTEMPTS):
+        assert s.docs.get("utenti/vincenzo/anteprime/950", {}).get("da_riprovare", True), f"run {run_number}"
+        await check(s, itunes, PickyNtfy(broken=["In arrivo"]))
+    assert "da_riprovare" not in s.docs["utenti/vincenzo/anteprime/950"]
+    again = PickyNtfy()
+    await check(s, itunes, again)
+    assert again.sent == []
+
+
+async def test_a_failed_reminder_is_tried_again_the_same_day():
+    s = store(extra={"utenti/vincenzo/anteprime/950": dict(ANNOUNCED)})
+    itunes = FakeItunes(NEW_ALBUM)
+    await check(s, itunes, PickyNtfy(broken=["Esce oggi"]), now=DAY)
+    assert not s.docs["utenti/vincenzo/anteprime/950"]["promemoria"]  # not told yet
+    ntfy = PickyNtfy()
+    await check(s, itunes, ntfy, now=DAY + timedelta(hours=3))
+    assert [n.title for n in ntfy.sent] == ["Esce oggi: Ava Max"]
+    assert s.docs["utenti/vincenzo/anteprime/950"]["promemoria"] == DAY + timedelta(hours=3)
+    again = PickyNtfy()
+    await check(s, itunes, again, now=DAY + timedelta(hours=6))
+    assert again.sent == []
+
+
+async def test_a_reminder_gives_up_after_a_few_runs():
+    s = store(extra={"utenti/vincenzo/anteprime/950": dict(ANNOUNCED)})
+    itunes = FakeItunes(NEW_ALBUM)
+    for hours in range(0, 3 * MAX_ATTEMPTS, 3):
+        await check(s, itunes, PickyNtfy(broken=["Esce oggi"]), now=DAY + timedelta(hours=hours))
+    assert s.docs["utenti/vincenzo/anteprime/950"]["promemoria"]  # stopped trying
+    again = PickyNtfy()
+    await check(s, itunes, again, now=DAY + timedelta(hours=12))
+    assert again.sent == []
+
+
+async def test_a_failed_announcement_does_not_repeat_the_new_release_notification():
+    s = store()
+    deezer = AVA_DEEZER + [deezer_rel(3, "Singolo Nuovo", "2026-11-12")]
+    itunes = FakeItunes(NEW_ALBUM)
+    first = PickyNtfy(broken=["In arrivo"])
+    lines = await check(s, itunes, first, deezer)
+    assert [n.title for n in first.sent] == ["Nuovo singolo: Ava Max"]
+    assert "| Artisti da ricontrollare (notifica non riuscita) | 0 |" in lines  # the release went out fine
+    second = PickyNtfy()
+    await check(s, itunes, second, deezer)
+    assert [n.title for n in second.sent] == ["In arrivo: Ava Max"]  # only the announcement
