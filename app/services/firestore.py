@@ -20,6 +20,7 @@ from app.config import settings
 
 FIRESTORE_URL = "https://firestore.googleapis.com/v1"
 SCOPES = ["https://www.googleapis.com/auth/datastore"]
+RETRY_STATUSES = {429, 500, 502, 503, 504}  # busy or down for a moment: worth another try
 
 
 class FirestoreError(Exception):
@@ -151,9 +152,13 @@ class FirestoreClient:
         token: str | Callable[[], str],
         timeout: float = 15.0,
         transport: httpx.AsyncBaseTransport | None = None,
+        retries: int = 3,
+        retry_wait: float = 2.0,
     ) -> None:
         self.project_id = project_id
         self._token = token
+        self.retries = retries
+        self.retry_wait = retry_wait
         self._root = f"projects/{project_id}/databases/(default)/documents"
         self._client = httpx.AsyncClient(
             base_url=f"{FIRESTORE_URL}/projects/{project_id}/databases/(default)/documents/",
@@ -184,10 +189,21 @@ class FirestoreClient:
         return {"Authorization": f"Bearer {self._token}"}
 
     async def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
-        try:
-            resp = await self._client.request(method, path.strip("/"), headers=self._headers(), **kwargs)
-        except httpx.HTTPError as err:
-            raise FirestoreError(f"Firestore non risponde ({type(err).__name__})") from err
+        """One call, tried again (waiting a little more each time) when Firestore is busy or
+        unreachable for a moment. Every call here can be repeated safely: reads, whole-document
+        writes and deletes."""
+        for attempt in range(self.retries + 1):
+            try:
+                resp = await self._client.request(method, path.strip("/"), headers=self._headers(), **kwargs)
+            except httpx.HTTPError as err:
+                if attempt < self.retries:
+                    await asyncio.sleep(self.retry_wait * (attempt + 1))
+                    continue
+                raise FirestoreError(f"Firestore non risponde ({type(err).__name__})") from err
+            if resp.status_code in RETRY_STATUSES and attempt < self.retries:
+                await asyncio.sleep(self.retry_wait * (attempt + 1))
+                continue
+            break
         if resp.status_code >= 400 and resp.status_code != 404:
             try:
                 message = resp.json()["error"]["message"]

@@ -71,7 +71,7 @@ def test_service_account_key_checks():
 # ---- HTTP client ----
 
 def client(routes, log=None, token="token-finto") -> FirestoreClient:
-    return FirestoreClient("demo-cns", token, transport=json_transport(routes, log))
+    return FirestoreClient("demo-cns", token, transport=json_transport(routes, log), retry_wait=0)
 
 
 async def test_get_existing_and_missing_documents():
@@ -149,3 +149,54 @@ async def test_sign_in_failure_is_explained():
     with pytest.raises(FirestoreError, match="accesso con l'account di servizio non riuscito"):
         async with client({}, token=token):
             pass
+
+
+# ---- Temporary errors are retried ----
+
+async def test_temporary_errors_are_retried():
+    unavailable = httpx.Response(503, json={"error": {"message": "The service is currently unavailable."}})
+    too_many = httpx.Response(429, json={"error": {"message": "Quota exceeded."}})
+    log = []
+    routes = {f"{BASE}/stato/github": [unavailable, too_many, {"fields": {"origine": {"stringValue": "prova"}}}]}
+    async with client(routes, log) as db:
+        assert await db.get("stato/github") == {"origine": "prova"}
+    assert len(log) == 3
+
+
+async def test_writes_are_retried_too():
+    log = []
+    routes = {f"{BASE}/visti/1": [httpx.Response(500, json={}), {"name": "x"}]}
+    async with client(routes, log) as db:
+        await db.set("visti/1", {"ids": ["1"]})
+    assert [r.method for r in log] == ["PATCH", "PATCH"]
+
+
+async def test_a_dropped_connection_is_retried():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        if len(calls) == 1:
+            raise httpx.ConnectTimeout("lento")
+        return httpx.Response(200, json={"fields": {}})
+
+    async with FirestoreClient("demo-cns", "token-finto", transport=httpx.MockTransport(handler), retry_wait=0) as db:
+        assert await db.get("a/b") == {}
+    assert len(calls) == 2
+
+
+async def test_it_gives_up_after_the_retries():
+    log = []
+    async with client({f"{BASE}/stato/github": httpx.Response(503, json={"error": {"message": "giù"}})}, log) as db:
+        with pytest.raises(FirestoreError, match="HTTP 503: giù"):
+            await db.get("stato/github")
+    assert len(log) == 4  # the first try and 3 more
+
+
+async def test_refusals_are_not_retried():
+    log = []
+    denied = httpx.Response(403, json={"error": {"message": "Missing or insufficient permissions."}})
+    async with client({f"{BASE}/stato/github": denied}, log) as db:
+        with pytest.raises(FirestoreError, match="403"):
+            await db.get("stato/github")
+    assert len(log) == 1

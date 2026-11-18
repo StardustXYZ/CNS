@@ -186,7 +186,10 @@ class DeezerClient:
                 raise DeezerError(f"Deezer non risponde ({type(err).__name__})") from err
             self.calls += 1
             too_many = resp.status_code == 429
-            if not too_many:
+            server_error = resp.status_code >= 500  # a gateway page, not JSON: wait and try again
+            if server_error:
+                failure = f"Deezer ha risposto con HTTP {resp.status_code}"
+            elif not too_many:
                 try:
                     data = resp.json()
                 except ValueError:
@@ -204,9 +207,11 @@ class DeezerClient:
                 if code != QUOTA_ERROR_CODE:
                     raise DeezerError(f"errore di Deezer {code}: {error.get('message')}")
                 too_many = True
+            if too_many:
+                failure = "Deezer continua a dire che le chiamate sono troppe"
             if attempt < self.retries:
                 await asyncio.sleep(self.retry_wait * (attempt + 1))
-        raise DeezerError("Deezer continua a dire che le chiamate sono troppe")
+        raise DeezerError(failure)
 
     async def search_artists(self, query: str, limit: int = 10) -> list[DeezerArtist]:
         """Artists whose name matches the query, in Deezer's order."""

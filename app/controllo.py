@@ -27,7 +27,7 @@ from __future__ import annotations
 import asyncio
 from collections import Counter
 import contextlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 import os
 import re
@@ -57,6 +57,7 @@ LISTS_TO_CHECK = ("controllare", "recuperando")  # new releases matter in both; 
 NOTIFY_LIST = "controllare"  # only these get a notification; in Recuperando they go to the end of the queue
 RECENT_DAYS = 30  # an older release appearing now is Deezer filling in its catalogue, not news
 MAX_SINGLE_NOTIFICATIONS = 3  # more new releases for one person become one notification
+MAX_ATTEMPTS = 3  # a notification that fails is tried again in the next runs, up to this many in all
 TOPIC_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 ALLOW_LIST_PATH = "config/ammessi"  # who may use CNS (managed by the administrator in the app)
 
@@ -150,6 +151,7 @@ class Report:
     users_told: int = 0
     notifications: int = 0
     notification_errors: int = 0
+    to_retry: int = 0  # artists left "unseen" because a notification failed: checked again next run
     no_topic: int = 0
     itunes_matched: int = 0
     itunes_errors: int = 0
@@ -175,16 +177,24 @@ class UserNews:
         return bool(self.releases or self.announced or self.reminders)
 
 
+def release_notifications(news: UserNews, now: datetime) -> list:
+    """The notifications of the new releases: one each up to 3, else one together."""
+    novita = settings.APP_URL.rstrip("/") + "/#/novita"  # "Apri l'app" opens Novità
+    releases = [n for n in news.releases if title_key(n.release.title) not in news.skip_titles]
+    if len(releases) <= MAX_SINGLE_NOTIFICATIONS:
+        return [release_notification(n.artist.name, n.release, now, app_url=novita) for n in releases]
+    return [summary_notification([(n.artist.name, n.release) for n in releases], now)]
+
+
 def notifications_for(news: UserNews, now: datetime) -> list:
     """One person's notifications: releases (one each up to 3, else one together), then the
     announcements the same way, then the release-day reminders."""
-    novita = settings.APP_URL.rstrip("/") + "/#/novita"  # "Apri l'app" opens Novità
+    return release_notifications(news, now) + announcement_notifications(news, now)
+
+
+def announcement_notifications(news: UserNews, now: datetime) -> list:
+    """The announcements (one each up to 3, else one together) and the release-day reminders."""
     out = []
-    releases = [n for n in news.releases if title_key(n.release.title) not in news.skip_titles]
-    if len(releases) <= MAX_SINGLE_NOTIFICATIONS:
-        out += [release_notification(n.artist.name, n.release, now, app_url=novita) for n in releases]
-    else:
-        out.append(summary_notification([(n.artist.name, n.release) for n in releases], now))
     if len(news.announced) <= MAX_SINGLE_NOTIFICATIONS:
         out += [announce_notification(a["artista"], a["titolo"], a["tipo"], date.fromisoformat(a["data"]),
                                       a.get("copertina") or None, a.get("link") or None, now) for a in news.announced]
@@ -210,16 +220,41 @@ def is_admitted(uid: str, settings_doc: dict, allow_list: dict | None) -> bool:
 async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
                     sender_for: Callable[[str], NotificationSender], report: Report,
                     allow_list: dict | None = None, phones: list[tuple[str, str]] | None = None,
-                    push: PushSender | None = None) -> None:
+                    push: PushSender | None = None) -> bool:
     """Save the user's news in Novità and send the notifications to their ntfy topic and to
-    the phones registered in the Android app (``phones``: document path and token)."""
+    the phones registered in the Android app (``phones``: document path and token).
+
+    Returns False when a notification of the new releases failed and there are tries left:
+    the caller then keeps the artists "unseen", so the next run comes back here. A release
+    already in Novità and not marked ``da_riprovare`` was told in an earlier run (the run
+    may have stopped before it could write "seen"): it is skipped, never told twice.
+    """
     settings_doc = await db.get(f"utenti/{uid}") or {}
     if not is_admitted(uid, settings_doc, allow_list):
         report.not_admitted += 1  # removed from the list: nothing more for them
-        return
+        return True
+    pending: list[NewRelease] = []
+    tries: dict[str, int] = {}  # release id -> tries so far, this one included
+    first_told: dict[str, datetime] = {}  # release id -> when it first reached Novità
     for item in news.releases:
-        await db.set(f"utenti/{uid}/novita/{item.release.id}", novita_document(item, now))
-    notifications = notifications_for(news, now)
+        old = await db.get(f"utenti/{uid}/novita/{item.release.id}")
+        if old is not None and not old.get("da_riprovare"):
+            continue
+        pending.append(item)
+        tries[str(item.release.id)] = int((old or {}).get("tentativi") or 0) + 1
+        first_told[str(item.release.id)] = (old or {}).get("notificata") or now
+    news = replace(news, releases=pending)
+    if not news:
+        return True
+    report.users_told += 1
+    # In Novità at once, marked "to try again" until the notifications have gone out
+    for item in pending:
+        key = str(item.release.id)
+        await db.set(f"utenti/{uid}/novita/{key}",
+                     {**novita_document(item, first_told[key]), "da_riprovare": True, "tentativi": tries[key]})
+    release_part = release_notifications(news, now)
+    notifications = release_part + announcement_notifications(news, now)
+    failed = False  # a notification of the releases did not go out
     phones = phones if push else []
     topic = str(settings_doc.get("ntfy") or "").strip()
     if not TOPIC_PATTERN.match(topic):
@@ -233,18 +268,28 @@ async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
                 report.notifications += 1
             except Exception:  # noqa: BLE001 - one failed notification must not stop the others
                 report.notification_errors += 1
+                failed = failed or any(notification is n for n in release_part)
     for path, token in phones or []:
         for notification in notifications:
             try:
                 delivered = await push.send(token, notification)
             except Exception:  # noqa: BLE001 - one phone must not stop the others
                 report.push_errors += 1
+                failed = failed or any(notification is n for n in release_part)
                 continue
             if not delivered:
                 await db.delete(path)  # the app is not on that phone any more
                 report.phones_removed += 1
                 break
             report.push_sent += 1
+    retry = False
+    for item in pending:
+        key = str(item.release.id)
+        if failed and tries[key] < MAX_ATTEMPTS:
+            retry = True  # left marked: the next run tries again
+        else:
+            await db.set(f"utenti/{uid}/novita/{key}", novita_document(item, first_told[key]))
+    return not retry
 
 
 def phones_by_user(documents: list[tuple[str, dict]]) -> dict[str, list[tuple[str, str]]]:
@@ -318,6 +363,10 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
     report.phones = sum(len(p) for p in phones.values())
     today = now.date()
     per_user: dict[str, UserNews] = {}
+    # "Seen" is written only after the people are told: if the run stops halfway, or a
+    # notification fails, the next run finds the same releases again instead of losing them.
+    pending_seen: dict[str, dict] = {}  # Deezer id -> its ``visti`` document
+    recipients: dict[str, set[str]] = {}  # Deezer id -> the people due to be told about its news
     for artist in (a for a in artists.values() if a.to_check):
         try:
             releases = await deezer.artist_releases(int(artist.id))
@@ -335,11 +384,14 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
         for uid, data in artist.followers.items():
             if data.get("lista") == NOTIFY_LIST:
                 kinds = wanted_kinds(data)
-                per_user.setdefault(uid, UserNews()).releases.extend(n for n in news if n.kind in kinds)
+                mine = [n for n in news if n.kind in kinds]
+                per_user.setdefault(uid, UserNews()).releases.extend(mine)
+                if mine:
+                    recipients.setdefault(artist.id, set()).add(uid)
         fields = itunes_fields(seen)
         if itunes and any(d.get("lista") == NOTIFY_LIST for d in artist.followers.values()):
             fields = await check_announcements(db, itunes, artist, releases, seen, now, saved_announcements, per_user, report)
-        await db.set(f"visti/{artist.id}", {**seen_state(artist, releases, now), **fields})
+        pending_seen[artist.id] = {**seen_state(artist, releases, now), **fields}
     # Release day of the announced releases; old announcements go away
     for uid, mine in saved_announcements.items():
         for key, doc in list(mine.items()):
@@ -354,10 +406,16 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
                 del mine[key]
         if uid in per_user:
             per_user[uid].skip_titles = announced_titles_around(mine, today)
+    to_retry: set[str] = set()  # people a notification failed for: their artists are checked again
     for uid, user_news in per_user.items():
-        if user_news:
-            report.users_told += 1
-            await tell_user(db, uid, user_news, now, sender_for, report, allow_list, phones.get(uid, []), push)
+        if user_news and not await tell_user(db, uid, user_news, now, sender_for, report, allow_list,
+                                             phones.get(uid, []), push):
+            to_retry.add(uid)
+    for artist_id, state in pending_seen.items():
+        if recipients.get(artist_id, set()) & to_retry:
+            report.to_retry += 1
+            continue
+        await db.set(f"visti/{artist_id}", state)
     await db.set(STATUS_PATH, {
         "ultimo_contatto": now,
         "origine": "controllo",
@@ -386,6 +444,7 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
         f"| Persone avvisate | {report.users_told} |",
         f"| Notifiche inviate | {report.notifications} |",
         f"| Notifiche non riuscite | {report.notification_errors} |",
+        f"| Artisti da ricontrollare (notifica non riuscita) | {report.to_retry} |",
         f"| Telefoni con l'app Android | {report.phones} |",
         f"| Notifiche inviate all'app | {report.push_sent} |",
         f"| Notifiche all'app non riuscite | {report.push_errors} |",

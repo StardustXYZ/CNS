@@ -154,3 +154,26 @@ async def test_other_errors_are_reported():
     async with client({"/search/artist": httpx.Response(500, json={})}) as deezer:
         with pytest.raises(DeezerError, match="HTTP 500"):
             await deezer.search_artists("X")
+
+
+async def test_server_errors_wait_and_retry():
+    page = httpx.Response(502, text="<html>Bad Gateway</html>", headers={"Content-Type": "text/html"})
+    routes = {"/search/artist": [httpx.Response(503, json={}), page, {"data": [{"id": 1, "name": "K/DA"}]}]}
+    async with client(routes) as deezer:
+        found = await deezer.search_artists("K/DA")
+    assert [a.name for a in found] == ["K/DA"]
+    assert deezer.calls == 3
+
+
+async def test_server_errors_give_up_after_retries():
+    async with client({"/search/artist": httpx.Response(500, json={})}) as deezer:
+        with pytest.raises(DeezerError, match="HTTP 500"):
+            await deezer.search_artists("X")
+    assert deezer.calls == 4
+
+
+async def test_client_errors_are_not_retried():
+    async with client({"/search/artist": httpx.Response(404, json={})}) as deezer:
+        with pytest.raises(DeezerError, match="HTTP 404"):
+            await deezer.search_artists("X")
+    assert deezer.calls == 1

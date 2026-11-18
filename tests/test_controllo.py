@@ -6,9 +6,12 @@ from __future__ import annotations
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from app.controllo import find_new, group_artists, run_check
+import pytest
+
+from app.controllo import MAX_ATTEMPTS, find_new, group_artists, run_check
 from app.prova_firebase import STATUS_PATH
 from app.services.deezer import DeezerError, DeezerRelease
+from app.services.firestore import FirestoreError
 
 ROME = ZoneInfo("Europe/Rome")
 NOW = datetime(2026, 11, 13, 15, 17, tzinfo=ROME)
@@ -51,15 +54,15 @@ class FakeDeezer:
 
 
 class FakeNtfy:
-    def __init__(self, fail=False):
-        self.sent, self.fail = [], fail
+    def __init__(self, fail=False, fail_topics=()):
+        self.sent, self.fail, self.fail_topics = [], fail, set(fail_topics)
 
     def __call__(self, topic):
         outer = self
 
         class Sender:
             async def send(self, notification):
-                if outer.fail:
+                if outer.fail or topic in outer.fail_topics:
                     raise RuntimeError("ntfy giù")
                 outer.sent.append((topic, notification))
 
@@ -212,3 +215,81 @@ async def test_people_removed_from_the_allow_list_get_nothing():
     assert sorted(topic for topic, _ in ntfy.sent) == ["argomento-dell-amica", "argomento-di-vincenzo"]
     assert "utenti/ex/novita/3" not in store.docs
     assert "| Persone non più ammesse (saltate) | 1 |" in lines
+
+
+# ---- A failure must not lose news: "seen" is written only once the people are told ----
+
+class FlakyStore(FakeStore):
+    """A store that fails once when a given document is read (Firestore had a bad moment)."""
+
+    def __init__(self, *args, fail_get=()):
+        super().__init__(*args)
+        self.fail_get = set(fail_get)
+
+    async def get(self, path):
+        if path in self.fail_get:
+            self.fail_get.discard(path)
+            raise FirestoreError("Firestore ha risposto con HTTP 503: giù")
+        return await super().get(path)
+
+
+AVA_NEW = rel(3, "Christmas Wonderland", "2026-11-06")
+
+
+async def test_a_firestore_failure_midway_loses_no_news():
+    rows = [("vincenzo", AVA, "Ava Max", "controllare", {}), ("vincenzo", GAGA, "Lady Gaga", "controllare", {})]
+    base = store_with_history(rows)
+    store = FlakyStore(base.artists, base.docs, fail_get=[f"visti/{GAGA}"])  # Ava is done before Gaga fails
+    deezer = FakeDeezer({AVA: AVA_OLD + [AVA_NEW], GAGA: GAGA_OLD})
+    ntfy = FakeNtfy()
+    with pytest.raises(FirestoreError):
+        await run_check(store, deezer, NOW, ntfy)
+    assert "3" not in store.docs[f"visti/{AVA}"]["ids"]  # not "seen" yet: nobody was told
+    await run_check(store, deezer, NOW, ntfy)  # the next run
+    assert [n.title for _, n in ntfy.sent] == ["Nuovo singolo: Ava Max"]
+    assert "utenti/vincenzo/novita/3" in store.docs
+    assert "3" in store.docs[f"visti/{AVA}"]["ids"]
+
+
+async def test_a_failed_notification_is_tried_again_only_for_the_person_it_failed_for():
+    store = store_with_history([("vincenzo", AVA, "Ava Max", "controllare", {}), ("amica", AVA, "Ava Max", "controllare", {})])
+    deezer = FakeDeezer({AVA: AVA_OLD + [AVA_NEW]})
+    first = FakeNtfy(fail_topics=["argomento-dell-amica"])
+    lines = await run_check(store, deezer, NOW, first)
+    assert [t for t, _ in first.sent] == ["argomento-di-vincenzo"]
+    assert "3" not in store.docs[f"visti/{AVA}"]["ids"]  # to be checked again
+    assert store.docs["utenti/amica/novita/3"]["da_riprovare"] is True  # she can read it in the app meanwhile
+    assert "da_riprovare" not in store.docs["utenti/vincenzo/novita/3"]
+    assert "| Artisti da ricontrollare (notifica non riuscita) | 1 |" in lines
+
+    second = FakeNtfy()
+    await run_check(store, deezer, NOW, second)
+    assert [t for t, _ in second.sent] == ["argomento-dell-amica"]  # vincenzo is not told twice
+    assert "da_riprovare" not in store.docs["utenti/amica/novita/3"]
+    assert "3" in store.docs[f"visti/{AVA}"]["ids"]
+
+    third = FakeNtfy()
+    await run_check(store, deezer, NOW, third)
+    assert third.sent == []  # nothing left to do
+
+
+async def test_a_retry_keeps_the_original_time_of_the_news():
+    store = store_with_history([("vincenzo", AVA, "Ava Max", "controllare", {})])
+    deezer = FakeDeezer({AVA: AVA_OLD + [AVA_NEW]})
+    await run_check(store, deezer, NOW, FakeNtfy(fail=True))
+    later = datetime(2026, 11, 13, 18, 17, tzinfo=ROME)
+    await run_check(store, deezer, later, FakeNtfy())
+    assert store.docs["utenti/vincenzo/novita/3"]["notificata"] == NOW
+
+
+async def test_it_gives_up_retrying_after_a_few_runs():
+    store = store_with_history([("vincenzo", AVA, "Ava Max", "controllare", {})])
+    deezer = FakeDeezer({AVA: AVA_OLD + [AVA_NEW]})
+    for run in range(MAX_ATTEMPTS):
+        assert "3" not in store.docs[f"visti/{AVA}"]["ids"], f"run {run}"
+        await run_check(store, deezer, NOW, FakeNtfy(fail=True))
+    assert "3" in store.docs[f"visti/{AVA}"]["ids"]  # no more tries: the news stays in Novità
+    assert "da_riprovare" not in store.docs["utenti/vincenzo/novita/3"]
+    again = FakeNtfy()
+    await run_check(store, deezer, NOW, again)
+    assert again.sent == []
