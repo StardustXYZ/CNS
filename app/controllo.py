@@ -215,9 +215,10 @@ def announcement_notifications(news: UserNews, now: datetime) -> list:
 
 def is_admitted(uid: str, settings_doc: dict, allow_list: dict | None) -> bool:
     """Whether the person is still admitted (config/ammessi): the administrator, or an e-mail in
-    the list. The app saves each person's e-mail in their settings. Without a list: everybody."""
+    the list. The app saves each person's e-mail in their settings. Without a list: nobody, as
+    in the security rules (firebase/firestore.rules): a deleted list must not open the doors."""
     if allow_list is None:
-        return True
+        return False
     if allow_list.get("admin") == uid:
         return True
     email = str(settings_doc.get("email") or "").strip().lower()
@@ -486,9 +487,13 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
         "uscite_nuove": report.new_releases,
         "in_arrivo": report.announced,
     })
+    warning = [] if allow_list is not None else [
+        "⚠️ Manca la lista delle persone ammesse (config/ammessi su Firebase): nessuno viene avvisato.", "",
+    ]
     return [
         f"✅ Giro del {now:%d/%m/%Y alle %H:%M}.",
         "",
+        *warning,
         "| | Numero |",
         "|---|---|",
         f"| Utenti con almeno un artista | {len(users)} |",

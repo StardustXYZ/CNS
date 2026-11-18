@@ -94,6 +94,7 @@ def store(lista="controllare", extra=None, **artist_fields):
     return FakeStore({
         f"utenti/vincenzo/artisti/{AVA}": {"nome": "Ava Max", "lista": lista, **artist_fields},
         "utenti/vincenzo": {"ntfy": "argomento"},
+        "config/ammessi": {"admin": "vincenzo", "email": []},
         f"visti/{AVA}": seen,
         **(extra or {}),
     })

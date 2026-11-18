@@ -20,6 +20,7 @@ from app.services.ntfy import PRIORITY_QUIET, Notification
 ROME = ZoneInfo("Europe/Rome")
 DAY = datetime(2026, 11, 15, 16, 0, tzinfo=ROME)
 NIGHT = datetime(2026, 11, 15, 23, 30, tzinfo=ROME)
+ADMIN_A = {"admin": "a", "email": []}  # who is admitted: without a list nobody is
 
 
 def run(coro):
@@ -164,7 +165,7 @@ def test_notifiche_a_ntfy_e_ai_telefoni_e_il_telefono_sparito_va_tolto():
     news = UserNews(releases=[controllo.NewRelease(controllo.FollowedArtist("1", "Ava Max", {}), release(9, "Prova"), "single")])
     ntfy, push, report = FakeNtfy(), FakePush(gone={"vecchio"}), Report()
     phones = [("utenti/a/telefoni/p1", "nuovo"), ("utenti/a/telefoni/p2", "vecchio")]
-    run(tell_user(db, "a", news, DAY, ntfy, report, None, phones, push))
+    run(tell_user(db, "a", news, DAY, ntfy, report, ADMIN_A, phones, push))
     assert ntfy.sent == [("argomento-a", "Nuovo singolo: Ava Max")]
     assert push.sent == [("nuovo", "Nuovo singolo: Ava Max")]
     assert db.deleted == ["utenti/a/telefoni/p2"]
@@ -175,7 +176,7 @@ def test_senza_argomento_ntfy_basta_il_telefono():
     db = FakeStore(docs={"utenti/a": {}})
     news = UserNews(releases=[controllo.NewRelease(controllo.FollowedArtist("1", "Ava Max", {}), release(9, "Prova"), "single")])
     push, report = FakePush(broken={"rotto"}), Report()
-    run(tell_user(db, "a", news, NIGHT, FakeNtfy(), report, None,
+    run(tell_user(db, "a", news, NIGHT, FakeNtfy(), report, ADMIN_A,
                   [("utenti/a/telefoni/p1", "tok"), ("utenti/a/telefoni/p2", "rotto")], push))
     assert push.sent == [("tok", "Nuovo singolo: Ava Max")]
     assert (report.no_topic, report.push_sent, report.push_errors) == (0, 1, 1)
@@ -185,7 +186,7 @@ def test_senza_ntfy_e_senza_telefoni_resta_solo_in_novita():
     db = FakeStore(docs={"utenti/a": {}})
     news = UserNews(releases=[controllo.NewRelease(controllo.FollowedArtist("1", "Ava Max", {}), release(9, "Prova"), "single")])
     report = Report()
-    run(tell_user(db, "a", news, DAY, FakeNtfy(), report, None, [], FakePush()))
+    run(tell_user(db, "a", news, DAY, FakeNtfy(), report, ADMIN_A, [], FakePush()))
     assert report.no_topic == 1
     assert "utenti/a/novita/9" in db.docs
 
@@ -200,7 +201,7 @@ def test_il_giro_completo_manda_anche_ai_telefoni():
             "artisti": [("utenti/a/artisti/1", {"nome": "Ava Max", "lista": "controllare"})],
             "telefoni": [("utenti/a/telefoni/p1", {"token": "tok"})],
         },
-        docs={"visti/1": {"ids": ["1"], "chiavi": ["single|vecchia"]}, "utenti/a": {}},
+        docs={"visti/1": {"ids": ["1"], "chiavi": ["single|vecchia"]}, "utenti/a": {}, "config/ammessi": ADMIN_A},
     )
     push = FakePush()
     lines = run(run_check(db, Deezer(), DAY, FakeNtfy(), None, push))

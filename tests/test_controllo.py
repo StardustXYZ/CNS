@@ -82,8 +82,9 @@ def store_with_history(rows, extra_docs=None):
     docs = {
         f"visti/{AVA}": seen_from(AVA, "Ava Max", AVA_OLD),
         f"visti/{GAGA}": seen_from(GAGA, "Lady Gaga", GAGA_OLD),
+        "config/ammessi": {"admin": "vincenzo", "email": ["amica@example.com"]},
         "utenti/vincenzo": {"ntfy": "argomento-di-vincenzo"},
-        "utenti/amica": {"ntfy": "argomento-dell-amica"},
+        "utenti/amica": {"ntfy": "argomento-dell-amica", "email": "amica@example.com"},
         **(extra_docs or {}),
     }
     return FakeStore(artists(*rows), docs)
@@ -313,3 +314,24 @@ async def test_seen_releases_only_grow():
     after = seen_state(artist, AVA_OLD, NOW, before)
     assert after["ids"] == before["ids"] and after["chiavi"] == before["chiavi"]
     assert seen_state(artist, AVA_OLD, NOW, None)["ids"] == ["1", "2"]  # first time: only what is there
+
+
+async def test_without_the_allow_list_nobody_is_told():
+    # The rules let nobody in without config/ammessi: the check does the same, it does not
+    # fall back to "everybody".
+    store = store_with_history([("vincenzo", AVA, "Ava Max", "controllare", {}), ("amica", AVA, "Ava Max", "controllare", {})])
+    del store.docs["config/ammessi"]
+    ntfy = FakeNtfy()
+    lines = await run_check(store, FakeDeezer({AVA: AVA_OLD + [AVA_NEW]}), NOW, ntfy)
+    assert ntfy.sent == []
+    assert not any(p.startswith("utenti/") and "/novita/" in p for p in store.docs)
+    assert "| Persone non più ammesse (saltate) | 2 |" in lines
+    assert any("lista delle persone ammesse" in line for line in lines)  # said at the top of the report
+
+
+async def test_the_administrator_alone_is_enough():
+    store = store_with_history([("vincenzo", AVA, "Ava Max", "controllare", {})], {"config/ammessi": {"admin": "vincenzo"}})
+    ntfy = FakeNtfy()
+    lines = await run_check(store, FakeDeezer({AVA: AVA_OLD + [AVA_NEW]}), NOW, ntfy)
+    assert [t for t, _ in ntfy.sent] == ["argomento-di-vincenzo"]
+    assert not any("lista delle persone ammesse" in line for line in lines)
