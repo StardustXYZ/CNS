@@ -170,3 +170,46 @@ test("senza la lista degli ammessi non entra nessuno", async () => {
     await assertFails(getDocs(collection(as("vincenzo"), "utenti/vincenzo/artisti")));
     await assertFails(setDoc(doc(as("vincenzo"), "config/ammessi"), ALLOW_LIST)); // it is created only in the console
 });
+
+// ---- What an artist document may hold: only the fields the apps write, of the right kind and size ----
+
+/** An artist as the two apps save it, with every field they know. */
+const FULL_ARTIST = {
+    ...AVA, aggiunto: serverTimestamp(), link: "https://www.deezer.com/artist/12948083",
+    fatte: { "single|sweet but psycho": { s: "a", t: 1763000000000 } },
+    canzoni: { "album|heaven hell": { "enemy": 1763000000001 } },
+    tipi_recupero: ["album", "single"], tipi_avviso: ["album", "ep", "single", "featuring"],
+    auto_sposta: true, fine_tenuta: false,
+};
+const artistDoc = (db, id = "12948083") => doc(db, `utenti/vincenzo/artisti/${id}`);
+
+test("un artista come lo salvano le due app, con tutti i suoi campi, è accettato", async () => {
+    const db = as("vincenzo");
+    await assertSucceeds(setDoc(artistDoc(db), FULL_ARTIST));
+    await assertSucceeds(updateDoc(artistDoc(db), { fatte: { "album|x": { s: "s", t: 1 } }, canzoni: {}, fine_tenuta: true }));
+});
+
+test("un artista non può avere campi che le app non scrivono", async () => {
+    const db = as("vincenzo");
+    await assertFails(setDoc(artistDoc(db), { ...AVA, extra: "x" }));
+    await assertSucceeds(setDoc(artistDoc(db), AVA));
+    await assertFails(updateDoc(artistDoc(db), { extra: "x" }));
+    await assertFails(updateDoc(artistDoc(db), { "fatte.a": { s: "a", t: 1 }, altro: 1 }));
+});
+
+test("i campi di un artista hanno il tipo e la misura giusti", async () => {
+    const db = as("vincenzo");
+    const bad = [
+        { foto: 12 }, { foto: "x".repeat(501) }, { link: { a: 1 } }, { link: "x".repeat(501) },
+        { fan: "tanti" }, { aggiunto: "ieri" },
+        { fatte: "tutte" }, { fatte: Object.fromEntries(Array.from({ length: 2001 }, (_, i) => [`k${i}`, { s: "a", t: i }])) },
+        { canzoni: [] }, { canzoni: Object.fromEntries(Array.from({ length: 2001 }, (_, i) => [`k${i}`, {}])) },
+        { tipi_recupero: "album" }, { tipi_recupero: Array(11).fill("album") },
+        { tipi_avviso: "album" }, { tipi_avviso: Array(11).fill("album") },
+        { auto_sposta: "si" }, { fine_tenuta: 1 },
+    ];
+    for (const extra of bad) {
+        await assertFails(setDoc(artistDoc(db), { ...AVA, ...extra }), JSON.stringify(extra).slice(0, 60));
+    }
+    await assertSucceeds(setDoc(artistDoc(db), { ...AVA, foto: "", link: "", fan: 0 })); // empty is fine
+});

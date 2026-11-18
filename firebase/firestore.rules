@@ -95,11 +95,25 @@ service cloud.firestore {
       return !('ntfy' in s) || (s.ntfy is string && (s.ntfy == '' || s.ntfy.matches('^[A-Za-z0-9_-]{1,64}$')));
     }
 
+    // The fields are the ones the web app and the Android app write (and the backup file keeps),
+    // each of the right kind and size: nothing else can be stored in the account's folder
     function validArtist(artistId, a) {
       return artistId.matches('^[0-9]{1,20}$')
+        && a.keys().hasOnly(['nome', 'foto', 'link', 'fan', 'lista', 'nota', 'aggiunto', 'fatte', 'canzoni',
+                             'tipi_recupero', 'tipi_avviso', 'auto_sposta', 'fine_tenuta'])
         && a.nome is string && a.nome.size() > 0 && a.nome.size() <= 200
         && a.lista in ['controllare', 'recuperando', 'archivio']
-        && (!('nota' in a) || (a.nota is string && a.nota.size() <= 500));
+        && (!('nota' in a) || (a.nota is string && a.nota.size() <= 500))
+        && (!('foto' in a) || (a.foto is string && a.foto.size() <= 500))
+        && (!('link' in a) || (a.link is string && a.link.size() <= 500))
+        && (!('fan' in a) || a.fan is number)
+        && (!('aggiunto' in a) || a.aggiunto is timestamp)
+        && (!('fatte' in a) || (a.fatte is map && a.fatte.size() <= 2000))      // release -> {s, t}
+        && (!('canzoni' in a) || (a.canzoni is map && a.canzoni.size() <= 2000))  // release -> songs ticked
+        && (!('tipi_recupero' in a) || (a.tipi_recupero is list && a.tipi_recupero.size() <= 10))
+        && (!('tipi_avviso' in a) || (a.tipi_avviso is list && a.tipi_avviso.size() <= 10))
+        && (!('auto_sposta' in a) || a.auto_sposta is bool)
+        && (!('fine_tenuta' in a) || a.fine_tenuta is bool);
     }
   }
 }
