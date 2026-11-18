@@ -293,3 +293,23 @@ async def test_it_gives_up_retrying_after_a_few_runs():
     again = FakeNtfy()
     await run_check(store, deezer, NOW, again)
     assert again.sent == []
+
+
+async def test_a_release_deezer_leaves_out_for_a_run_is_not_news_when_it_comes_back():
+    store = store_with_history([("vincenzo", AVA, "Ava Max", "controllare", {})])
+    ntfy = FakeNtfy()
+    await run_check(store, FakeDeezer({AVA: AVA_OLD + [AVA_NEW]}), NOW, ntfy)
+    assert len(ntfy.sent) == 1
+    await run_check(store, FakeDeezer({AVA: AVA_OLD}), NOW, ntfy)  # Deezer's catalogue misses it for a moment
+    assert {"3"} <= set(store.docs[f"visti/{AVA}"]["ids"])  # still remembered
+    await run_check(store, FakeDeezer({AVA: AVA_OLD + [AVA_NEW]}), NOW, ntfy)
+    assert len(ntfy.sent) == 1  # and not announced a second time
+
+
+async def test_seen_releases_only_grow():
+    from app.controllo import FollowedArtist, seen_state
+    artist = FollowedArtist(AVA, "Ava Max")
+    before = seen_state(artist, AVA_OLD + [AVA_NEW], NOW)
+    after = seen_state(artist, AVA_OLD, NOW, before)
+    assert after["ids"] == before["ids"] and after["chiavi"] == before["chiavi"]
+    assert seen_state(artist, AVA_OLD, NOW, None)["ids"] == ["1", "2"]  # first time: only what is there

@@ -118,11 +118,16 @@ def find_new(artist: FollowedArtist, releases: list[DeezerRelease], seen: dict, 
     return list(news.values())
 
 
-def seen_state(artist: FollowedArtist, releases: list[DeezerRelease], now: datetime) -> dict:
+def seen_state(artist: FollowedArtist, releases: list[DeezerRelease], now: datetime,
+               previous: dict | None = None) -> dict:
+    """What is saved in ``visti/<Deezer id>``: the releases seen so far plus the ones in
+    ``releases``. It only grows: a release Deezer leaves out of its catalogue for a moment
+    would otherwise look new when it comes back."""
+    before = previous or {}
     return {
         "nome": artist.name,
-        "ids": sorted({str(r.id) for r in releases}),
-        "chiavi": sorted({group_key(r.title, r.record_type, artist.name) for r in releases}),
+        "ids": sorted({str(i) for i in before.get("ids", [])} | {str(r.id) for r in releases}),
+        "chiavi": sorted(set(before.get("chiavi", [])) | {group_key(r.title, r.record_type, artist.name) for r in releases}),
         "aggiornato": now,
     }
 
@@ -439,7 +444,7 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
         fields = itunes_fields(seen)
         if itunes and any(d.get("lista") == NOTIFY_LIST for d in artist.followers.values()):
             fields = await check_announcements(db, itunes, artist, releases, seen, now, saved_announcements, report)
-        pending_seen[artist.id] = {**seen_state(artist, releases, now), **fields}
+        pending_seen[artist.id] = {**seen_state(artist, releases, now, seen), **fields}
     # What is still to tell about the announced releases: the new ones and the ones whose
     # notification failed before (``da_riprovare``), and the reminders of the release day (not
     # sent yet: ``promemoria`` stays empty until it is). Old announcements go away.
