@@ -35,7 +35,7 @@ jobs:
           python-version: "3.12"
 
       - name: Installa CNS
-        run: pip install -e .
+        run: pip install -e . -c constraints.txt
 
       - name: Leggi le discografie da Deezer e manda la notifica di prova
         env:

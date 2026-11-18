@@ -39,7 +39,7 @@ jobs:
           python-version: "3.12"
 
       - name: Installa CNS
-        run: pip install -e .
+        run: pip install -e . -c constraints.txt
 
       - name: Costruisci il sito
         run: python -m app.build_site --out site

@@ -1,0 +1,35 @@
+# Versioni esatte delle librerie Python (quelle con cui sono provati i test).
+# I controlli girano ogni 3 ore su GitHub: una libreria che esce con una versione nuova non deve
+# cambiare il comportamento senza che nessuno se ne accorga.
+#
+# Si usa con:   pip install -e ".[dev]" -c constraints.txt      (lo fanno tutti i workflow)
+# Per aggiornare, una libreria per volta e provando i test (python -m pytest) a ogni passo:
+#   in un ambiente nuovo   pip install -e ".[dev,icone]"   poi   pip freeze --exclude-editable
+# e si tengono solo i pacchetti che arrivano da pyproject.toml (con le loro dipendenze).
+# colorama serve solo a pytest su Windows: su GitHub (Linux) non si installa.
+anyio==4.16.0
+certifi==2026.10.23
+cffi==2.1.1
+charset-normalizer==3.5.2
+colorama==0.4.6
+cryptography==50.0.2
+google-auth==2.62.2
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.20
+iniconfig==2.3.1
+packaging==26.3
+pillow==13.0.0
+pluggy==1.7.0
+pyasn1==0.6.5
+pyasn1_modules==0.4.2
+pycparser==3.12
+Pygments==2.21.0
+pytest==9.2.0
+pytest-asyncio==1.5.0
+python-dotenv==1.2.4
+requests==2.34.2
+typing_extensions==4.16.0
+tzdata==2026.6
+urllib3==2.8.0

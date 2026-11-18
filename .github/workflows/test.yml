@@ -22,7 +22,7 @@ jobs:
           python-version: "3.12"
 
       - name: Installa CNS
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev]" -c constraints.txt
 
       - name: Test Python
         run: python -m pytest -q

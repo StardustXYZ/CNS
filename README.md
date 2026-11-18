@@ -32,6 +32,9 @@ dice e la scarichi dallo stesso posto.
 
 - Prove: `python -m pytest` (controllo), `node --test web/test/*.test.mjs` (app web),
   `npm test` in `firebase/` (regole), `flutter test` in `mobile/` (app Android).
+- Le librerie Python hanno la versione fissata in `constraints.txt` (si installano con
+  `pip install -e ".[dev]" -c constraints.txt`, come fanno i workflow). Per aggiornarne una:
+  cambia la sua riga, prova `python -m pytest` e committa.
 - I segreti (chiave dell'account di servizio, argomento ntfy) stanno nel file `.env` e nei
   segreti di GitHub; `google-services.json`, la chiave di firma e `key.properties` restano sul PC.
   Nessuno di questi va mai nel repository.
