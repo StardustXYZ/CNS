@@ -1,5 +1,6 @@
-# Test automatici a ogni push, su qualsiasi ramo: Python (con servizi finti) e regole di
-# Firebase (sull'emulatore, progetto "demo-cns": mai i dati veri).
+# Test automatici a ogni push, su qualsiasi ramo: Python (con servizi finti), app web,
+# app Android (analisi e test di Flutter, senza costruire l'APK) e regole di Firebase
+# (sull'emulatore, progetto "demo-cns": mai i dati veri).
 name: Test
 
 on:
@@ -38,6 +39,32 @@ jobs:
 
       - name: Test dell'app (JavaScript)
         run: node --test "web/test/*.test.mjs"
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+
+      # La stessa versione di Flutter usata sul PC (mobile/README.md)
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.35.7"
+          channel: stable
+          cache: true
+
+      - name: Scarica i pacchetti
+        run: flutter pub get
+
+      - name: Analisi del codice
+        run: flutter analyze
+
+      # Le prove leggono anche tests/fixtures (cartella principale), condivise con Python e web
+      - name: Test dell'app Android
+        run: flutter test
 
   regole:
     runs-on: ubuntu-latest
