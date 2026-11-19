@@ -57,6 +57,7 @@ LISTS_TO_CHECK = ("controllare", "recuperando")  # new releases matter in both; 
 NOTIFY_LIST = "controllare"  # only these get a notification; in Recuperando they go to the end of the queue
 RECENT_DAYS = 30  # an older release appearing now is Deezer filling in its catalogue, not news
 MAX_SINGLE_NOTIFICATIONS = 3  # more new releases for one person become one notification
+CHANNEL_NTFY, CHANNEL_PHONES = "ntfy", "telefoni"  # where a release is told; a retry skips the ones that worked
 MAX_ATTEMPTS = 3  # a notification that fails is tried again in the next runs, up to this many in all
 TOPIC_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 ALLOW_LIST_PATH = "config/ammessi"  # who may use CNS (managed by the administrator in the app)
@@ -157,6 +158,7 @@ class Report:
     notifications: int = 0
     notification_errors: int = 0
     to_retry: int = 0  # artists left "unseen" because a notification failed: checked again next run
+    user_errors: int = 0  # people an unexpected error stopped for: told again next run, the others go on
     no_topic: int = 0
     itunes_matched: int = 0
     itunes_errors: int = 0
@@ -255,6 +257,7 @@ async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
     pending: list[NewRelease] = []
     tries: dict[str, int] = {}  # release id -> tries so far, this one included
     first_told: dict[str, datetime] = {}  # release id -> when it first reached Novità
+    channels_done: dict[str, set[str]] = {}  # release id -> channels it already reached (a retry)
     for item in news.releases:
         old = await db.get(f"utenti/{uid}/novita/{item.release.id}")
         if old is not None and not old.get("da_riprovare"):
@@ -262,6 +265,7 @@ async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
         pending.append(item)
         tries[str(item.release.id)] = int((old or {}).get("tentativi") or 0) + 1
         first_told[str(item.release.id)] = (old or {}).get("notificata") or now
+        channels_done[str(item.release.id)] = set((old or {}).get("canali_ok") or [])
     news = replace(news, releases=pending)
     if not news:
         return Delivery()
@@ -270,10 +274,14 @@ async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
     for item in pending:
         key = str(item.release.id)
         await db.set(f"utenti/{uid}/novita/{key}",
-                     {**novita_document(item, first_told[key]), "da_riprovare": True, "tentativi": tries[key]})
+                     {**novita_document(item, first_told[key]), "da_riprovare": True, "tentativi": tries[key],
+                      "canali_ok": sorted(channels_done[key])})
     release_part = release_notifications(news, now)
-    notifications = release_part + announcement_notifications(news, now)
-    failed = other_failed = False  # a notification of the releases / of the announcements did not go out
+    other_part = announcement_notifications(news, now)
+    # Channels (ntfy, phones) that already got the releases in an earlier run: not told twice
+    done_before = set.intersection(*(channels_done.get(str(i.release.id), set()) for i in pending)) if pending else set()
+    failed: set[str] = set()  # channels where a release notification did not go out
+    other_failed = False  # a notification of the announcements did not go out
     phones = phones if push else []
     topic = str(settings_doc.get("ntfy") or "").strip()
     if not TOPIC_PATTERN.match(topic):
@@ -281,24 +289,24 @@ async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
             report.no_topic += 1  # still in the app: the notification waits for a topic or a phone
     else:
         sender = sender_for(topic)
-        for notification in notifications:
+        for notification in ([] if CHANNEL_NTFY in done_before else release_part) + other_part:
             try:
                 await sender.send(notification)
                 report.notifications += 1
             except Exception:  # noqa: BLE001 - one failed notification must not stop the others
                 report.notification_errors += 1
                 if any(notification is n for n in release_part):
-                    failed = True
+                    failed.add(CHANNEL_NTFY)
                 else:
                     other_failed = True
     for path, token in phones or []:
-        for notification in notifications:
+        for notification in ([] if CHANNEL_PHONES in done_before else release_part) + other_part:
             try:
                 delivered = await push.send(token, notification)
             except Exception:  # noqa: BLE001 - one phone must not stop the others
                 report.push_errors += 1
                 if any(notification is n for n in release_part):
-                    failed = True
+                    failed.add(CHANNEL_PHONES)
                 else:
                     other_failed = True
                 continue
@@ -307,11 +315,19 @@ async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
                 report.phones_removed += 1
                 break
             report.push_sent += 1
+    reached = set(done_before)  # channels the releases are sure to have reached
+    if TOPIC_PATTERN.match(topic) and CHANNEL_NTFY not in failed:
+        reached.add(CHANNEL_NTFY)
+    if phones and CHANNEL_PHONES not in failed:
+        reached.add(CHANNEL_PHONES)
     retry = False
     for item in pending:
         key = str(item.release.id)
         if failed and tries[key] < MAX_ATTEMPTS:
-            retry = True  # left marked: the next run tries again
+            retry = True  # left marked: the next run tries again, only on the channels that failed
+            await db.set(f"utenti/{uid}/novita/{key}", {**novita_document(item, first_told[key]),
+                                                       "da_riprovare": True, "tentativi": tries[key],
+                                                       "canali_ok": sorted(reached)})
         else:
             await db.set(f"utenti/{uid}/novita/{key}", novita_document(item, first_told[key]))
     return Delivery(releases_ok=not retry, others_ok=not other_failed)
@@ -482,10 +498,16 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
     for uid, user_news in per_user.items():
         if not user_news:
             continue
-        delivery = await tell_user(db, uid, user_news, now, sender_for, report, allow_list, phones.get(uid, []), push)
-        if not delivery.releases_ok:
+        try:
+            delivery = await tell_user(db, uid, user_news, now, sender_for, report, allow_list, phones.get(uid, []), push)
+            if not delivery.releases_ok:
+                to_retry.add(uid)
+            await settle_announcements(db, uid, user_news, delivery, now, saved_announcements, report)
+        except FirestoreError:
+            raise  # the database is not answering: stop here, nothing is marked "seen"
+        except Exception:  # noqa: BLE001 - one person's unexpected error must not block everybody, every run
+            report.user_errors += 1  # only the number goes in the public log
             to_retry.add(uid)
-        await settle_announcements(db, uid, user_news, delivery, now, saved_announcements, report)
     for artist_id, state in pending_seen.items():
         if recipients.get(artist_id, set()) & to_retry:
             report.to_retry += 1
@@ -524,6 +546,7 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
         f"| Notifiche inviate | {report.notifications} |",
         f"| Notifiche non riuscite | {report.notification_errors} |",
         f"| Artisti da ricontrollare (notifica non riuscita) | {report.to_retry} |",
+        f"| Persone con un errore imprevisto (riprovate) | {report.user_errors} |",
         f"| Telefoni con l'app Android | {report.phones} |",
         f"| Notifiche inviate all'app | {report.push_sent} |",
         f"| Notifiche all'app non riuscite | {report.push_errors} |",

@@ -335,3 +335,67 @@ async def test_the_administrator_alone_is_enough():
     lines = await run_check(store, FakeDeezer({AVA: AVA_OLD + [AVA_NEW]}), NOW, ntfy)
     assert [t for t, _ in ntfy.sent] == ["argomento-di-vincenzo"]
     assert not any("lista delle persone ammesse" in line for line in lines)
+
+
+class PhoneStore(FakeStore):
+    """FakeStore that also has one phone for vincenzo."""
+
+    async def collection_group(self, collection_id):
+        if collection_id == "telefoni":
+            return [("utenti/vincenzo/telefoni/p1", {"token": "tok"})]
+        return await super().collection_group(collection_id)
+
+    async def delete(self, path):
+        self.docs.pop(path, None)
+
+
+class BrokenPush:
+    def __init__(self, broken=True):
+        self.broken, self.sent = broken, []
+
+    async def send(self, token, notification):
+        if self.broken:
+            raise RuntimeError("FCM giù")
+        self.sent.append((token, notification.title))
+        return True
+
+
+async def test_a_failed_channel_is_retried_alone_without_a_second_ntfy():
+    base = store_with_history([("vincenzo", AVA, "Ava Max", "controllare", {})])
+    store = PhoneStore(base.artists, base.docs)
+    deezer = FakeDeezer({AVA: AVA_OLD + [AVA_NEW]})
+    ntfy, push = FakeNtfy(), BrokenPush(broken=True)
+    await run_check(store, deezer, NOW, ntfy, push=push)
+    assert len(ntfy.sent) == 1  # ntfy went out, the phone did not
+    assert store.docs["utenti/vincenzo/novita/3"]["canali_ok"] == ["ntfy"]
+    assert "3" not in store.docs[f"visti/{AVA}"]["ids"]
+
+    push.broken = False
+    await run_check(store, deezer, NOW, ntfy, push=push)
+    assert len(ntfy.sent) == 1  # no duplicate on ntfy
+    assert push.sent == [("tok", "Nuovo singolo: Ava Max")]
+    assert "da_riprovare" not in store.docs["utenti/vincenzo/novita/3"]
+    assert "3" in store.docs[f"visti/{AVA}"]["ids"]
+
+
+async def test_an_unexpected_error_for_one_person_does_not_block_the_others():
+    store = store_with_history([("vincenzo", AVA, "Ava Max", "controllare", {}), ("amica", AVA, "Ava Max", "controllare", {})])
+    deezer = FakeDeezer({AVA: AVA_OLD + [AVA_NEW]})
+
+    class Broken(FakeNtfy):
+        def __call__(self, topic):
+            if topic == "argomento-dell-amica":
+                raise ValueError("sender rotto")  # not from send(): outside the notification try/except
+            return super().__call__(topic)
+
+    first = Broken()
+    lines = await run_check(store, deezer, NOW, first)
+    assert [t for t, _ in first.sent] == ["argomento-di-vincenzo"]  # vincenzo is told anyway
+    assert "3" not in store.docs[f"visti/{AVA}"]["ids"]  # and amica's artist is checked again
+    assert "| Persone con un errore imprevisto (riprovate) | 1 |" in lines
+    assert not any("amica" in line or "vincenzo" in line for line in lines)
+
+    second = FakeNtfy()
+    await run_check(store, deezer, NOW, second)
+    assert [t for t, _ in second.sent] == ["argomento-dell-amica"]
+    assert "3" in store.docs[f"visti/{AVA}"]["ids"]
