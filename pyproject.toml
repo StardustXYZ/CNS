@@ -1,7 +1,7 @@
 [project]
 name = "cns"
 version = "0.1.0"
-description = "CNS – Chi Ni Sentimu: avvisi sulle uscite nuove dei cantanti seguiti e recupero delle discografie"
+description = "CNS – Chi Ni Sindimu: avvisi sulle uscite nuove dei cantanti seguiti e recupero delle discografie"
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.25",

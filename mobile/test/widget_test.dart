@@ -23,7 +23,7 @@ void main() {
   testWidgets('il titolo e le quattro voci del menu, come il web', (tester) async {
     await openApp(tester);
     expect(find.text('CNS'), findsOneWidget);
-    expect(find.text('Chi Ni Sentimu'), findsOneWidget);
+    expect(find.text('Chi Ni Sindimu'), findsOneWidget);
     for (final label in ['Controllare', 'Recuperando', 'Novità', 'Impostazioni']) {
       expect(menuItem(label), findsOneWidget);
     }

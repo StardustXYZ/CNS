@@ -1,1 +1,1 @@
-"""CNS – Chi Ni Sentimu."""
+"""CNS – Chi Ni Sindimu."""

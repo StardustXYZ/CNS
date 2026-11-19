@@ -156,7 +156,7 @@ class HomeShellState extends State<HomeShell> {
   }
 }
 
-/// "🎧 CNS Chi Ni Sentimu", as the logo of the web app.
+/// "🎧 CNS Chi Ni Sindimu", as the logo of the web app.
 class CnsTitle extends StatelessWidget {
   const CnsTitle({super.key});
 
@@ -175,7 +175,7 @@ class CnsTitle extends StatelessWidget {
         // On a narrow phone it shortens instead of overflowing
         Flexible(
           child: Text(
-            'Chi Ni Sentimu',
+            'Chi Ni Sindimu',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: CnsColors.textMuted),

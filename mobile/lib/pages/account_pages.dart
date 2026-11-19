@@ -162,7 +162,7 @@ class AccessGate extends StatelessWidget {
                   const SizedBox(height: 8),
                   const Text('CNS',
                       textAlign: TextAlign.center, style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
-                  const Text('Chi Ni Sentimu',
+                  const Text('Chi Ni Sindimu',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 15, fontStyle: FontStyle.italic, color: CnsColors.textMuted)),
                   const SizedBox(height: 24),

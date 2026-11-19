@@ -1,5 +1,5 @@
 name: cns
-description: "CNS - Chi Ni Sentimu: le uscite degli artisti che segui"
+description: "CNS - Chi Ni Sindimu: le uscite degli artisti che segui"
 publish_to: 'none' # private app, never published on pub.dev
 
 # versionName+versionCode on Android: raise both for every APK given to friends

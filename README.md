@@ -1,4 +1,4 @@
-# CNS – Chi Ni Sentimu
+# CNS – Chi Ni Sindimu
 
 Le uscite nuove degli artisti che segui, e le discografie da recuperare dall'inizio.
 

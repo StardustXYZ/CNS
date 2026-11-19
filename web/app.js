@@ -1,4 +1,4 @@
-// CNS (Chi Ni Sentimu) – app for the phone (and the PC).
+// CNS (Chi Ni Sindimu) – app for the phone (and the PC).
 // Pages are chosen by the hash (#/, #/recuperando, …), as in CNV's phone version: the
 // menu stays on one line and a sideways swipe moves to the next or previous page.
 // Every Google account has its own lists in Firebase (utenti/{code}/artisti); artists are

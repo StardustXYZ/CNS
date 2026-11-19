@@ -37,8 +37,6 @@ ThemeData cnsTheme() {
       foregroundColor: CnsColors.text,
       elevation: 0,
       scrolledUnderElevation: 0,
-      // The green line under the title, as the web navbar
-      shape: Border(bottom: BorderSide(color: CnsColors.green, width: 2)),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: CnsColors.bar,

@@ -105,7 +105,7 @@ Future<void> main() async {
 /// For the messages at the bottom of the screen shown from outside the pages (notifications).
 final messengerKey = GlobalKey<ScaffoldMessengerState>();
 
-/// CNS (Chi Ni Sentimu): the releases of the artists you follow, on the phone.
+/// CNS (Chi Ni Sindimu): the releases of the artists you follow, on the phone.
 class CnsApp extends StatelessWidget {
   const CnsApp({
     super.key,
