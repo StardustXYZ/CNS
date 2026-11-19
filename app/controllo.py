@@ -236,6 +236,45 @@ class Delivery(NamedTuple):
     admitted: bool = True  # False: the person is not admitted (any more) and was told nothing
 
 
+async def send_notifications(db: DocumentStore, release_part: list, other_part: list, done_before: set[str],
+                             sender: NotificationSender | None, phones: list[tuple[str, str]],
+                             push: PushSender | None, report: Report) -> tuple[set[str], bool]:
+    """Send to the person's ntfy topic (``sender``, None without one) and to their phones.
+    The releases skip the channels in ``done_before``. Returns the channels where a release
+    notification failed, and whether an announcement or a reminder failed."""
+    failed: set[str] = set()
+    other_failed = False
+    is_release = lambda notification: any(notification is n for n in release_part)  # noqa: E731
+    if sender is not None:
+        for notification in ([] if CHANNEL_NTFY in done_before else release_part) + other_part:
+            try:
+                await sender.send(notification)
+                report.notifications += 1
+            except Exception:  # noqa: BLE001 - one failed notification must not stop the others
+                report.notification_errors += 1
+                if is_release(notification):
+                    failed.add(CHANNEL_NTFY)
+                else:
+                    other_failed = True
+    for path, token in phones:
+        for notification in ([] if CHANNEL_PHONES in done_before else release_part) + other_part:
+            try:
+                delivered = await push.send(token, notification)
+            except Exception:  # noqa: BLE001 - one phone must not stop the others
+                report.push_errors += 1
+                if is_release(notification):
+                    failed.add(CHANNEL_PHONES)
+                else:
+                    other_failed = True
+                continue
+            if not delivered:
+                await db.delete(path)  # the app is not on that phone any more
+                report.phones_removed += 1
+                break
+            report.push_sent += 1
+    return failed, other_failed
+
+
 async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
                     sender_for: Callable[[str], NotificationSender], report: Report,
                     allow_list: dict | None = None, phones: list[tuple[str, str]] | None = None,
@@ -280,41 +319,13 @@ async def tell_user(db: DocumentStore, uid: str, news: UserNews, now: datetime,
     other_part = announcement_notifications(news, now)
     # Channels (ntfy, phones) that already got the releases in an earlier run: not told twice
     done_before = set.intersection(*(channels_done.get(str(i.release.id), set()) for i in pending)) if pending else set()
-    failed: set[str] = set()  # channels where a release notification did not go out
-    other_failed = False  # a notification of the announcements did not go out
-    phones = phones if push else []
     topic = str(settings_doc.get("ntfy") or "").strip()
-    if not TOPIC_PATTERN.match(topic):
-        if not phones:
-            report.no_topic += 1  # still in the app: the notification waits for a topic or a phone
-    else:
-        sender = sender_for(topic)
-        for notification in ([] if CHANNEL_NTFY in done_before else release_part) + other_part:
-            try:
-                await sender.send(notification)
-                report.notifications += 1
-            except Exception:  # noqa: BLE001 - one failed notification must not stop the others
-                report.notification_errors += 1
-                if any(notification is n for n in release_part):
-                    failed.add(CHANNEL_NTFY)
-                else:
-                    other_failed = True
-    for path, token in phones or []:
-        for notification in ([] if CHANNEL_PHONES in done_before else release_part) + other_part:
-            try:
-                delivered = await push.send(token, notification)
-            except Exception:  # noqa: BLE001 - one phone must not stop the others
-                report.push_errors += 1
-                if any(notification is n for n in release_part):
-                    failed.add(CHANNEL_PHONES)
-                else:
-                    other_failed = True
-                continue
-            if not delivered:
-                await db.delete(path)  # the app is not on that phone any more
-                report.phones_removed += 1
-                break
-            report.push_sent += 1
+    phones = phones if push else []
+    failed, other_failed = await send_notifications(
+        db, release_part, other_part, done_before, sender_for(topic) if TOPIC_PATTERN.match(topic) else None,
+        phones, push, report)
+    if not TOPIC_PATTERN.match(topic) and not phones:
+        report.no_topic += 1  # still in the app: the notification waits for a topic or a phone
     reached = set(done_before)  # channels the releases are sure to have reached
     if TOPIC_PATTERN.match(topic) and CHANNEL_NTFY not in failed:
         reached.add(CHANNEL_NTFY)
@@ -425,25 +436,14 @@ async def check_announcements(db: DocumentStore, itunes: ReleaseSource, artist: 
     return fields
 
 
-async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
-                    sender_for: Callable[[str], NotificationSender], itunes: ReleaseSource | None = None,
-                    push: PushSender | None = None) -> list[str]:
-    """One run: read, compare, tell; returns the lines of the report (numbers only)."""
-    artists = group_artists(await db.collection_group("artisti"))
-    users = {uid for a in artists.values() for uid in a.followers}
-    lists = Counter(data.get("lista") for a in artists.values() for data in a.followers.values())
-    saved_announcements = announcements_by_user(await db.collection_group("anteprime")) if itunes else {}
-    allow_list = await db.get(ALLOW_LIST_PATH)
-    admission: dict[str, bool] = {}  # asked once per person in a run
-
-    async def admitted(uid: str) -> bool:
-        if uid not in admission:
-            admission[uid] = is_admitted(uid, await db.get(f"utenti/{uid}") or {}, allow_list)
-        return admission[uid]
-
-    phones = phones_by_user(await db.collection_group("telefoni")) if push else {}
-    report = Report()
-    report.phones = sum(len(p) for p in phones.values())
+async def check_artists(db: DocumentStore, deezer: DiscographySource, itunes: ReleaseSource | None,
+                        artists: dict[str, FollowedArtist], now: datetime, report: Report,
+                        saved_announcements: dict[str, dict[str, dict]],
+                        admitted: Callable[[str], Awaitable[bool]],
+                        ) -> tuple[dict[str, UserNews], dict[str, dict], dict[str, set[str]]]:
+    """Ask Deezer (and iTunes) about each artist and work out what each person is to be told.
+    Nothing is told or marked "seen" here. Returns what is to tell per person, the ``visti``
+    document to write for each Deezer artist, and the people due to be told about each artist."""
     today = now.date()
     per_user: dict[str, UserNews] = {}
     # "Seen" is written only after the people are told: if the run stops halfway, or a
@@ -475,10 +475,15 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
         if itunes and any(d.get("lista") == NOTIFY_LIST for d in artist.followers.values()):
             fields = await check_announcements(db, itunes, artist, releases, seen, now, saved_announcements, report, admitted)
         pending_seen[artist.id] = {**seen_state(artist, releases, now, seen), **fields}
-    # What is still to tell about the announced releases: the new ones and the ones whose
-    # notification failed before (``da_riprovare``), and the reminders of the release day (not
-    # sent yet: ``promemoria`` stays empty until it is). Old announcements go away.
-    for uid, mine in saved_announcements.items():
+    return per_user, pending_seen, recipients
+
+
+async def queue_announcements(db: DocumentStore, saved: dict[str, dict[str, dict]],
+                             per_user: dict[str, UserNews], today: date) -> None:
+    """Add to each person what is still to tell about the announced releases: the new ones and
+    the ones whose notification failed before (``da_riprovare``), and the reminders of the
+    release day (not sent yet: ``promemoria`` stays empty until it is). Old announcements go away."""
+    for uid, mine in saved.items():
         for key, doc in list(mine.items()):
             if is_expired(doc, today):
                 await db.delete(f"utenti/{uid}/anteprime/{key}")
@@ -494,6 +499,13 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
                 user.reminder_keys.append(key)
         if uid in per_user:
             per_user[uid].skip_titles = announced_titles_around(mine, today)
+
+
+async def tell_everyone(db: DocumentStore, per_user: dict[str, UserNews], now: datetime,
+                        sender_for: Callable[[str], NotificationSender], report: Report, allow_list: dict | None,
+                        phones: dict[str, list[tuple[str, str]]], push: PushSender | None,
+                        saved_announcements: dict[str, dict[str, dict]]) -> set[str]:
+    """Tell each person and close what went out. Returns the people to try again next run."""
     to_retry: set[str] = set()  # people a notification failed for: their artists are checked again
     for uid, user_news in per_user.items():
         if not user_news:
@@ -508,6 +520,33 @@ async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
         except Exception:  # noqa: BLE001 - one person's unexpected error must not block everybody, every run
             report.user_errors += 1  # only the number goes in the public log
             to_retry.add(uid)
+    return to_retry
+
+
+async def run_check(db: DocumentStore, deezer: DiscographySource, now: datetime,
+                    sender_for: Callable[[str], NotificationSender], itunes: ReleaseSource | None = None,
+                    push: PushSender | None = None) -> list[str]:
+    """One run: read, compare, tell; returns the lines of the report (numbers only)."""
+    artists = group_artists(await db.collection_group("artisti"))
+    users = {uid for a in artists.values() for uid in a.followers}
+    lists = Counter(data.get("lista") for a in artists.values() for data in a.followers.values())
+    saved_announcements = announcements_by_user(await db.collection_group("anteprime")) if itunes else {}
+    allow_list = await db.get(ALLOW_LIST_PATH)
+    admission: dict[str, bool] = {}  # asked once per person in a run
+
+    async def admitted(uid: str) -> bool:
+        if uid not in admission:
+            admission[uid] = is_admitted(uid, await db.get(f"utenti/{uid}") or {}, allow_list)
+        return admission[uid]
+
+    phones = phones_by_user(await db.collection_group("telefoni")) if push else {}
+    report = Report()
+    report.phones = sum(len(p) for p in phones.values())
+    today = now.date()
+    per_user, pending_seen, recipients = await check_artists(
+        db, deezer, itunes, artists, now, report, saved_announcements, admitted)
+    await queue_announcements(db, saved_announcements, per_user, today)
+    to_retry = await tell_everyone(db, per_user, now, sender_for, report, allow_list, phones, push, saved_announcements)
     for artist_id, state in pending_seen.items():
         if recipients.get(artist_id, set()) & to_retry:
             report.to_retry += 1
